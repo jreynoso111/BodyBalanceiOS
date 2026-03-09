@@ -1,0 +1,16 @@
+<svg width="1600" height="512" viewBox="0 0 1600 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brand_grad_h" x1="48" y1="36" x2="412" y2="476" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366F1" />
+      <stop offset="1" stop-color="#818CF8" />
+    </linearGradient>
+  </defs>
+  <rect x="36" y="36" width="440" height="440" rx="120" fill="url(#brand_grad_h)" />
+  <rect x="64" y="64" width="384" height="384" rx="100" fill="white" fill-opacity="0.09" />
+  <path d="M148 206C148 190.536 160.536 178 176 178H336C351.464 178 364 190.536 364 206V294C364 309.464 351.464 322 336 322H176C160.536 322 148 309.464 148 294V206Z" stroke="white" stroke-width="28" />
+  <path d="M148 230H364" stroke="white" stroke-width="28" stroke-linecap="round" />
+  <circle cx="392" cy="376" r="62" fill="#10B981" />
+  <path d="M362 376L384 398L422 362" stroke="white" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="538" y="244" fill="#0F172A" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="132" font-weight="900" letter-spacing="2">I GOT U</text>
+  <text x="544" y="310" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="38" font-weight="600">Lending made simple, secure, and human.</text>
+</svg>
