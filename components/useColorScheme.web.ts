@@ -1,8 +1,30 @@
-// NOTE: The default React Native styling doesn't support server rendering.
-// Server rendered styles should not change between the first render of the HTML
-// and the first render on the client. Typically, web developers will use CSS media queries
-// to render different styles on the client and server, these aren't directly supported in React Native
-// but can be achieved using a styling library like Nativewind.
+import { useEffect, useState } from 'react';
+import { useThemeStore } from '@/store/themeStore';
+
+function getSystemScheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'light';
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function useColorScheme() {
-  return 'light';
+  const preference = useThemeStore((state) => state.preference);
+  const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(getSystemScheme());
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (event: MediaQueryListEvent) => {
+      setSystemScheme(event.matches ? 'dark' : 'light');
+    };
+
+    setSystemScheme(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', onChange);
+    return () => mediaQuery.removeEventListener('change', onChange);
+  }, []);
+
+  return preference === 'system' ? systemScheme : preference;
 }

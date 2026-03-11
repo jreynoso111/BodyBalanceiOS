@@ -1,15 +1,14 @@
 import React from 'react';
 import { Redirect, Stack, useRouter, useSegments } from 'expo-router';
 import { Home, Users, Settings } from 'lucide-react-native';
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
 import { TouchableOpacity, View, StyleSheet, Text, Platform } from 'react-native';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/store/authStore';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() || 'light';
+  const { theme } = useAppTheme();
   const { t } = useI18n();
   const router = useRouter();
   const segments = useSegments();
@@ -48,7 +47,7 @@ export default function TabLayout() {
           backgroundColor: 'transparent',
         },
         headerStyle: {
-          backgroundColor: Colors[colorScheme].background,
+          backgroundColor: theme.navigation.background,
         },
         headerTitleStyle: {
           fontWeight: 'bold',
@@ -71,30 +70,30 @@ export default function TabLayout() {
               onPress={() => goToTab('home')}
               style={[
                 styles.headerNavBtn,
-                activeTab === 'home' && { backgroundColor: `${Colors[colorScheme].tint}20` },
+                activeTab === 'home' && { backgroundColor: theme.tintSoft },
               ]}
             >
-              <Home size={18} color={activeTab === 'home' ? Colors[colorScheme].tint : Colors[colorScheme].tabIconDefault} />
+              <Home size={18} color={activeTab === 'home' ? theme.tint : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => goToTab('contacts')}
               style={[
                 styles.headerNavBtn,
-                activeTab === 'contacts' && { backgroundColor: `${Colors[colorScheme].tint}20` },
+                activeTab === 'contacts' && { backgroundColor: theme.tintSoft },
               ]}
             >
-              <Users size={18} color={activeTab === 'contacts' ? Colors[colorScheme].tint : Colors[colorScheme].tabIconDefault} />
+              <Users size={18} color={activeTab === 'contacts' ? theme.tint : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => goToTab('settings')}
               style={[
                 styles.headerNavBtn,
-                activeTab === 'settings' && { backgroundColor: `${Colors[colorScheme].tint}20` },
+                activeTab === 'settings' && { backgroundColor: theme.tintSoft },
               ]}
             >
-              <Settings size={18} color={activeTab === 'settings' ? Colors[colorScheme].tint : Colors[colorScheme].tabIconDefault} />
+              <Settings size={18} color={activeTab === 'settings' ? theme.tint : '#94A3B8'} />
             </TouchableOpacity>
           </View>
         ),

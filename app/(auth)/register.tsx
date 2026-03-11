@@ -12,12 +12,14 @@ import { supabase } from '@/services/supabase';
 import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWithGoogle } from '@/services/oauth';
 import { useAuthStore } from '@/store/authStore';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 type FeedbackTone = 'error' | 'success' | 'info';
 type RegisterStep = 'details' | 'verify';
 
 export default function RegisterScreen() {
     const router = useRouter();
+    const { theme } = useAppTheme();
     const { initialized, user } = useAuthStore();
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
@@ -278,62 +280,62 @@ export default function RegisterScreen() {
             {step === 'details' ? (
                 <>
                     <RNView style={styles.inputGroup}>
-                        <Text style={styles.label}>Full Name</Text>
-                        <RNView style={styles.inputWrapper}>
-                            <User size={18} color="#94A3B8" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>Full Name</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <User size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
                                 placeholder="Enter your full name"
-                                placeholderTextColor="#94A3B8"
+                                placeholderTextColor={theme.tertiaryText}
                                 value={fullName}
                                 onChangeText={setFullName}
                                 autoCapitalize="words"
-                                style={styles.input}
+                                style={[styles.input, { color: theme.inputText }]}
                             />
                         </RNView>
                     </RNView>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={styles.label}>Email Address</Text>
-                        <RNView style={styles.inputWrapper}>
-                            <Mail size={18} color="#94A3B8" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>Email Address</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
                                 placeholder="Enter your email"
-                                placeholderTextColor="#94A3B8"
+                                placeholderTextColor={theme.tertiaryText}
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
-                                style={styles.input}
+                                style={[styles.input, { color: theme.inputText }]}
                             />
                         </RNView>
                     </RNView>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={styles.label}>Password</Text>
-                        <RNView style={styles.inputWrapper}>
-                            <Lock size={18} color="#94A3B8" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>Password</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <Lock size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
                                 placeholder="At least 10 chars, mixed case, and number"
-                                placeholderTextColor="#94A3B8"
+                                placeholderTextColor={theme.tertiaryText}
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry
-                                style={styles.input}
+                                style={[styles.input, { color: theme.inputText }]}
                             />
                         </RNView>
                     </RNView>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={styles.label}>Confirm Password</Text>
-                        <RNView style={styles.inputWrapper}>
-                            <Lock size={18} color="#94A3B8" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>Confirm Password</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <Lock size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
                                 placeholder="Repeat your password"
-                                placeholderTextColor="#94A3B8"
+                                placeholderTextColor={theme.tertiaryText}
                                 value={confirmPassword}
                                 onChangeText={setConfirmPassword}
                                 secureTextEntry
-                                style={styles.input}
+                                style={[styles.input, { color: theme.inputText }]}
                             />
                         </RNView>
                     </RNView>
@@ -341,25 +343,27 @@ export default function RegisterScreen() {
                     <TouchableOpacity
                         onPress={sendVerificationCode}
                         disabled={busy}
-                        style={[styles.primaryButton, busy && { opacity: 0.75 }]}
+                        style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, busy && { opacity: 0.75 }]}
                     >
-                        <Text style={styles.buttonText}>{loading ? 'SENDING CODE...' : 'Send Verification Code'}</Text>
+                        <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
+                            {loading ? 'SENDING CODE...' : 'Send Verification Code'}
+                        </Text>
                     </TouchableOpacity>
                 </>
             ) : (
                 <>
                     <RNView style={styles.inputGroup}>
-                        <Text style={styles.label}>Verification Code</Text>
-                        <RNView style={styles.inputWrapper}>
-                            <Mail size={18} color="#94A3B8" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>Verification Code</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
                                 placeholder="Enter 6-digit code"
-                                placeholderTextColor="#94A3B8"
+                                placeholderTextColor={theme.tertiaryText}
                                 value={verificationCode}
                                 onChangeText={setVerificationCode}
                                 autoCapitalize="none"
                                 keyboardType="number-pad"
-                                style={styles.input}
+                                style={[styles.input, { color: theme.inputText }]}
                                 maxLength={6}
                             />
                         </RNView>
@@ -368,9 +372,11 @@ export default function RegisterScreen() {
                     <TouchableOpacity
                         onPress={verifyEmailCode}
                         disabled={busy}
-                        style={[styles.primaryButton, busy && { opacity: 0.75 }]}
+                        style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, busy && { opacity: 0.75 }]}
                     >
-                        <Text style={styles.buttonText}>{verifyingCode ? 'VERIFYING...' : 'Verify Code & Create Account'}</Text>
+                        <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
+                            {verifyingCode ? 'VERIFYING...' : 'Verify Code & Create Account'}
+                        </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -378,7 +384,9 @@ export default function RegisterScreen() {
                         disabled={busy}
                         style={styles.secondaryButton}
                     >
-                        <Text style={styles.secondaryButtonText}>{loading ? 'SENDING...' : 'Resend code'}</Text>
+                        <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>
+                            {loading ? 'SENDING...' : 'Resend code'}
+                        </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -386,7 +394,7 @@ export default function RegisterScreen() {
                         disabled={busy}
                         style={styles.secondaryButton}
                     >
-                        <Text style={styles.secondaryButtonText}>Edit registration details</Text>
+                        <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>Edit registration details</Text>
                     </TouchableOpacity>
                 </>
             )}
@@ -398,12 +406,19 @@ export default function RegisterScreen() {
                         disabled={busy}
                         style={[
                             styles.googleButton,
+                            {
+                                backgroundColor: theme.googleButtonBackground,
+                                borderColor: theme.googleButtonBorder,
+                            },
                             busy && styles.googleButtonDisabled,
-                            googleUnavailableReason && styles.googleButtonUnavailable,
+                            googleUnavailableReason && {
+                                backgroundColor: theme.googleButtonUnavailableBackground,
+                                borderColor: theme.googleButtonUnavailableBorder,
+                            },
                         ]}
                     >
                         <GoogleLogo />
-                        <Text style={styles.googleButtonText}>
+                        <Text style={[styles.googleButtonText, { color: theme.googleButtonText }]}>
                             {googleLoading
                                 ? 'CONNECTING TO GOOGLE...'
                                 : googleUnavailableReason
@@ -413,30 +428,39 @@ export default function RegisterScreen() {
                     </TouchableOpacity>
 
                     {googleUnavailableReason ? (
-                        <Text style={styles.googleHintText}>{googleUnavailableReason}</Text>
+                        <Text style={[styles.googleHintText, { color: theme.secondaryText }]}>{googleUnavailableReason}</Text>
                     ) : null}
                 </>
             ) : null}
 
             <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.secondaryButton} disabled={busy}>
-                <Text style={styles.secondaryButtonText}>Already have an account? Sign In</Text>
+                <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>Already have an account? Sign In</Text>
             </TouchableOpacity>
 
             {feedback ? (
                 <RNView
                     style={[
                         styles.feedbackBox,
-                        feedback.tone === 'error' && styles.feedbackError,
-                        feedback.tone === 'success' && styles.feedbackSuccess,
-                        feedback.tone === 'info' && styles.feedbackInfo,
+                        feedback.tone === 'error' && {
+                            backgroundColor: theme.feedbackErrorBackground,
+                            borderColor: theme.feedbackErrorBorder,
+                        },
+                        feedback.tone === 'success' && {
+                            backgroundColor: theme.feedbackSuccessBackground,
+                            borderColor: theme.feedbackSuccessBorder,
+                        },
+                        feedback.tone === 'info' && {
+                            backgroundColor: theme.feedbackInfoBackground,
+                            borderColor: theme.feedbackInfoBorder,
+                        },
                     ]}
                 >
                     <Text
                         style={[
                             styles.feedbackText,
-                            feedback.tone === 'error' && styles.feedbackTextError,
-                            feedback.tone === 'success' && styles.feedbackTextSuccess,
-                            feedback.tone === 'info' && styles.feedbackTextInfo,
+                            feedback.tone === 'error' && { color: theme.feedbackErrorText },
+                            feedback.tone === 'success' && { color: theme.feedbackSuccessText },
+                            feedback.tone === 'info' && { color: theme.feedbackInfoText },
                         ]}
                     >
                         {feedback.text}
@@ -467,8 +491,10 @@ export default function RegisterScreen() {
                         altAction={{ href: '/(auth)/login', label: 'Back to sign in' }}
                     >
                         <RNView style={styles.webIntro}>
-                            <Text style={styles.webTitle}>{step === 'details' ? 'Create your account' : 'Verify your email'}</Text>
-                            <Text style={styles.webBody}>
+                            <Text style={[styles.webTitle, { color: theme.title }]}>
+                                {step === 'details' ? 'Create your account' : 'Verify your email'}
+                            </Text>
+                            <Text style={[styles.webBody, { color: theme.secondaryText }]}>
                                 {step === 'details'
                                     ? 'Set up your account credentials first. Buddy Balance will send a short verification code before final activation.'
                                     : 'Enter the six-digit code from your inbox to finish the account setup and unlock the web account center.'}
@@ -479,13 +505,13 @@ export default function RegisterScreen() {
                 ) : (
                 <RNView style={styles.content}>
                     <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.backButton}>
-                        <ArrowLeft size={20} color="#0F172A" />
-                        <Text style={styles.backText}>Back to login</Text>
+                        <ArrowLeft size={20} color={theme.backButton} />
+                        <Text style={[styles.backText, { color: theme.backButton }]}>Back to login</Text>
                     </TouchableOpacity>
 
                     <RNView style={styles.header}>
                         <BrandLogo size="md" showWordmark centered />
-                        <Text style={styles.subtitle}>Create your account</Text>
+                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>Create your account</Text>
                     </RNView>
 
                     <Card style={styles.authCard}>{form}</Card>
@@ -610,12 +636,7 @@ const styles = StyleSheet.create({
     googleButtonDisabled: {
         opacity: 0.75,
     },
-    googleButtonUnavailable: {
-        backgroundColor: '#F8FAFC',
-        borderColor: '#CBD5E1',
-    },
     googleButtonText: {
-        color: '#0F172A',
         fontSize: 14,
         fontWeight: '700',
     },
@@ -638,29 +659,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderWidth: 1,
     },
-    feedbackError: {
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        borderColor: 'rgba(239, 68, 68, 0.24)',
-    },
-    feedbackSuccess: {
-        backgroundColor: 'rgba(16, 185, 129, 0.08)',
-        borderColor: 'rgba(16, 185, 129, 0.24)',
-    },
-    feedbackInfo: {
-        backgroundColor: 'rgba(99, 102, 241, 0.08)',
-        borderColor: 'rgba(99, 102, 241, 0.24)',
-    },
     feedbackText: {
         fontSize: 13,
         fontWeight: '600',
-    },
-    feedbackTextError: {
-        color: '#B91C1C',
-    },
-    feedbackTextSuccess: {
-        color: '#047857',
-    },
-    feedbackTextInfo: {
-        color: '#4338CA',
     },
 });

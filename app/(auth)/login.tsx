@@ -11,11 +11,13 @@ import { waitForAuthSession } from '@/services/authSession';
 import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWithGoogle } from '@/services/oauth';
 import { useAuthStore } from '@/store/authStore';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 type FeedbackTone = 'error' | 'success' | 'info';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const { theme } = useAppTheme();
     const { initialized, user } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -148,31 +150,31 @@ export default function LoginScreen() {
     const form = (
         <>
             <RNView style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address</Text>
-                <RNView style={styles.inputWrapper}>
-                    <Mail size={18} color="#94A3B8" style={styles.inputIcon} />
+                <Text style={[styles.label, { color: theme.secondaryText }]}>Email Address</Text>
+                <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                    <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                     <TextInput
                         placeholder="Enter your email"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={theme.tertiaryText}
                         value={email}
                         onChangeText={setEmail}
                         autoCapitalize="none"
-                        style={styles.input}
+                        style={[styles.input, { color: theme.inputText }]}
                     />
                 </RNView>
             </RNView>
 
             <RNView style={styles.inputGroup}>
-                <Text style={styles.label}>Password</Text>
-                <RNView style={styles.inputWrapper}>
-                    <Lock size={18} color="#94A3B8" style={styles.inputIcon} />
+                <Text style={[styles.label, { color: theme.secondaryText }]}>Password</Text>
+                <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                    <Lock size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                     <TextInput
                         placeholder="••••••••"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={theme.tertiaryText}
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry
-                        style={styles.input}
+                        style={[styles.input, { color: theme.inputText }]}
                     />
                 </RNView>
             </RNView>
@@ -182,15 +184,17 @@ export default function LoginScreen() {
                 disabled={!!authAction}
                 style={styles.forgotButton}
             >
-                <Text style={styles.forgotButtonText}>Forgot your password?</Text>
+                <Text style={[styles.forgotButtonText, { color: theme.secondaryButtonText }]}>Forgot your password?</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
                 onPress={onSignIn}
                 disabled={!!authAction}
-                style={styles.primaryButton}
+                style={[styles.primaryButton, { backgroundColor: theme.primaryButton }]}
             >
-                <Text style={styles.buttonText}>{authAction === 'sign_in' ? 'SIGNING IN...' : 'Sign In'}</Text>
+                <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
+                    {authAction === 'sign_in' ? 'SIGNING IN...' : 'Sign In'}
+                </Text>
             </TouchableOpacity>
 
             {googleEnabledForBuild ? (
@@ -198,10 +202,20 @@ export default function LoginScreen() {
                     <TouchableOpacity
                         onPress={onGoogleSignIn}
                         disabled={!!authAction}
-                        style={[styles.googleButton, googleUnavailableReason && styles.googleButtonUnavailable]}
+                        style={[
+                            styles.googleButton,
+                            {
+                                backgroundColor: theme.googleButtonBackground,
+                                borderColor: theme.googleButtonBorder,
+                            },
+                            googleUnavailableReason && {
+                                backgroundColor: theme.googleButtonUnavailableBackground,
+                                borderColor: theme.googleButtonUnavailableBorder,
+                            },
+                        ]}
                     >
                         <GoogleLogo />
-                        <Text style={styles.googleButtonText}>
+                        <Text style={[styles.googleButtonText, { color: theme.googleButtonText }]}>
                             {authAction === 'google'
                                 ? 'CONNECTING TO GOOGLE...'
                                 : googleUnavailableReason
@@ -211,7 +225,7 @@ export default function LoginScreen() {
                     </TouchableOpacity>
 
                     {googleUnavailableReason ? (
-                        <Text style={styles.googleHintText}>{googleUnavailableReason}</Text>
+                        <Text style={[styles.googleHintText, { color: theme.secondaryText }]}>{googleUnavailableReason}</Text>
                     ) : null}
                 </>
             ) : null}
@@ -221,24 +235,33 @@ export default function LoginScreen() {
                 disabled={!!authAction}
                 style={styles.secondaryButton}
             >
-                <Text style={styles.secondaryButtonText}>Create New Account</Text>
+                <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>Create New Account</Text>
             </TouchableOpacity>
 
             {feedback ? (
                 <RNView
                     style={[
                         styles.feedbackBox,
-                        feedback.tone === 'error' && styles.feedbackError,
-                        feedback.tone === 'success' && styles.feedbackSuccess,
-                        feedback.tone === 'info' && styles.feedbackInfo,
+                        feedback.tone === 'error' && {
+                            backgroundColor: theme.feedbackErrorBackground,
+                            borderColor: theme.feedbackErrorBorder,
+                        },
+                        feedback.tone === 'success' && {
+                            backgroundColor: theme.feedbackSuccessBackground,
+                            borderColor: theme.feedbackSuccessBorder,
+                        },
+                        feedback.tone === 'info' && {
+                            backgroundColor: theme.feedbackInfoBackground,
+                            borderColor: theme.feedbackInfoBorder,
+                        },
                     ]}
                 >
                     <Text
                         style={[
                             styles.feedbackText,
-                            feedback.tone === 'error' && styles.feedbackTextError,
-                            feedback.tone === 'success' && styles.feedbackTextSuccess,
-                            feedback.tone === 'info' && styles.feedbackTextInfo,
+                            feedback.tone === 'error' && { color: theme.feedbackErrorText },
+                            feedback.tone === 'success' && { color: theme.feedbackSuccessText },
+                            feedback.tone === 'info' && { color: theme.feedbackInfoText },
                         ]}
                     >
                         {feedback.text}
@@ -269,8 +292,8 @@ export default function LoginScreen() {
                         altAction={{ href: '/', label: 'Back to public site' }}
                     >
                         <View style={styles.webIntro}>
-                            <Text style={styles.webTitle}>Welcome back</Text>
-                            <Text style={styles.webBody}>
+                            <Text style={[styles.webTitle, { color: theme.title }]}>Welcome back</Text>
+                            <Text style={[styles.webBody, { color: theme.secondaryText }]}>
                                 Sign in to manage your account, review your plan, and keep profile details aligned
                                 across mobile and web.
                             </Text>
@@ -283,12 +306,12 @@ export default function LoginScreen() {
                         <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/')}>
                             <BrandLogo size="lg" showWordmark centered />
                         </TouchableOpacity>
-                        <Text style={styles.subtitle}>Securely manage what's yours.</Text>
+                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>Securely manage what's yours.</Text>
                     </RNView>
 
                     <Card style={styles.authCard}>{form}</Card>
 
-                    <AppLegalFooter style={styles.copyright} />
+                    <AppLegalFooter style={[styles.copyright, { color: theme.secondaryText }]} />
                 </RNView>
                 )}
             </KeyboardAvoidingView>
@@ -397,10 +420,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 10,
     },
-    googleButtonUnavailable: {
-        backgroundColor: '#F8FAFC',
-        borderColor: '#CBD5E1',
-    },
     googleButtonText: {
         color: '#0F172A',
         fontSize: 14,
@@ -442,34 +461,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderWidth: 1,
     },
-    feedbackError: {
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        borderColor: 'rgba(239, 68, 68, 0.24)',
-    },
-    feedbackSuccess: {
-        backgroundColor: 'rgba(16, 185, 129, 0.08)',
-        borderColor: 'rgba(16, 185, 129, 0.24)',
-    },
-    feedbackInfo: {
-        backgroundColor: 'rgba(99, 102, 241, 0.08)',
-        borderColor: 'rgba(99, 102, 241, 0.24)',
-    },
     feedbackText: {
         fontSize: 13,
         fontWeight: '600',
     },
-    feedbackTextError: {
-        color: '#B91C1C',
-    },
-    feedbackTextSuccess: {
-        color: '#047857',
-    },
-    feedbackTextInfo: {
-        color: '#4338CA',
-    },
     copyright: {
         textAlign: 'center',
-        color: '#64748B',
         fontSize: 12,
         fontWeight: '600',
     },

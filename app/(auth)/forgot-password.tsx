@@ -7,11 +7,13 @@ import { Mail, ArrowLeft } from 'lucide-react-native';
 import { Text, Screen, Card } from '@/components/Themed';
 import { supabase } from '@/services/supabase';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 type FeedbackTone = 'error' | 'success' | 'info';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
+    const { theme } = useAppTheme();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string } | null>(null);
@@ -53,23 +55,23 @@ export default function ForgotPasswordScreen() {
 
     const form = (
         <Card style={styles.card}>
-            <Text style={styles.title}>Reset password</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: theme.title }]}>Reset password</Text>
+            <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
                 We will send a link to reset your password.
             </Text>
 
             <RNView style={styles.inputGroup}>
-                <Text style={styles.label}>Email</Text>
-                <RNView style={styles.inputWrapper}>
-                    <Mail size={18} color="#94A3B8" style={styles.inputIcon} />
+                <Text style={[styles.label, { color: theme.secondaryText }]}>Email</Text>
+                <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                    <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                     <TextInput
                         placeholder="name@email.com"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={theme.tertiaryText}
                         value={email}
                         onChangeText={setEmail}
                         autoCapitalize="none"
                         keyboardType="email-address"
-                        style={styles.input}
+                        style={[styles.input, { color: theme.inputText }]}
                     />
                 </RNView>
             </RNView>
@@ -77,26 +79,35 @@ export default function ForgotPasswordScreen() {
             <TouchableOpacity
                 onPress={onSendResetEmail}
                 disabled={loading}
-                style={[styles.primaryButton, loading && { opacity: 0.7 }]}
+                style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, loading && { opacity: 0.7 }]}
             >
-                <Text style={styles.buttonText}>{loading ? 'SENDING...' : 'Send link'}</Text>
+                <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>{loading ? 'SENDING...' : 'Send link'}</Text>
             </TouchableOpacity>
 
             {feedback ? (
                 <RNView
                     style={[
                         styles.feedbackBox,
-                        feedback.tone === 'error' && styles.feedbackError,
-                        feedback.tone === 'success' && styles.feedbackSuccess,
-                        feedback.tone === 'info' && styles.feedbackInfo,
+                        feedback.tone === 'error' && {
+                            backgroundColor: theme.feedbackErrorBackground,
+                            borderColor: theme.feedbackErrorBorder,
+                        },
+                        feedback.tone === 'success' && {
+                            backgroundColor: theme.feedbackSuccessBackground,
+                            borderColor: theme.feedbackSuccessBorder,
+                        },
+                        feedback.tone === 'info' && {
+                            backgroundColor: theme.feedbackInfoBackground,
+                            borderColor: theme.feedbackInfoBorder,
+                        },
                     ]}
                 >
                     <Text
                         style={[
                             styles.feedbackText,
-                            feedback.tone === 'error' && styles.feedbackTextError,
-                            feedback.tone === 'success' && styles.feedbackTextSuccess,
-                            feedback.tone === 'info' && styles.feedbackTextInfo,
+                            feedback.tone === 'error' && { color: theme.feedbackErrorText },
+                            feedback.tone === 'success' && { color: theme.feedbackSuccessText },
+                            feedback.tone === 'info' && { color: theme.feedbackInfoText },
                         ]}
                     >
                         {feedback.text}
@@ -127,8 +138,8 @@ export default function ForgotPasswordScreen() {
                         altAction={{ href: '/(auth)/login', label: 'Back to sign in' }}
                     >
                         <RNView style={styles.webIntro}>
-                            <Text style={styles.webTitle}>Forgot your password?</Text>
-                            <Text style={styles.webBody}>
+                            <Text style={[styles.webTitle, { color: theme.title }]}>Forgot your password?</Text>
+                            <Text style={[styles.webBody, { color: theme.secondaryText }]}>
                                 Enter the email you use for Buddy Balance and we will send a recovery link.
                             </Text>
                         </RNView>
@@ -137,8 +148,8 @@ export default function ForgotPasswordScreen() {
                 ) : (
                 <RNView style={styles.content}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <ArrowLeft size={20} color="#0F172A" />
-                        <Text style={styles.backText}>Back</Text>
+                        <ArrowLeft size={20} color={theme.backButton} />
+                        <Text style={[styles.backText, { color: theme.backButton }]}>Back</Text>
                     </TouchableOpacity>
                     {form}
                 </RNView>
@@ -247,29 +258,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderWidth: 1,
     },
-    feedbackError: {
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        borderColor: 'rgba(239, 68, 68, 0.24)',
-    },
-    feedbackSuccess: {
-        backgroundColor: 'rgba(16, 185, 129, 0.08)',
-        borderColor: 'rgba(16, 185, 129, 0.24)',
-    },
-    feedbackInfo: {
-        backgroundColor: 'rgba(99, 102, 241, 0.08)',
-        borderColor: 'rgba(99, 102, 241, 0.24)',
-    },
     feedbackText: {
         fontSize: 13,
         fontWeight: '600',
-    },
-    feedbackTextError: {
-        color: '#B91C1C',
-    },
-    feedbackTextSuccess: {
-        color: '#047857',
-    },
-    feedbackTextInfo: {
-        color: '#4338CA',
     },
 });

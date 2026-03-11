@@ -18,6 +18,8 @@ import {
 import { applyInvitationCode, formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
 import { normalizePlanTier } from '@/services/subscriptionPlan';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
+import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 const isMissingDefaultLanguageColumn = (message?: string) =>
   String(message || '').toLowerCase().includes('default_language');
@@ -27,6 +29,7 @@ const isMissingFriendCodeColumn = (message?: string) =>
 export default function ProfileScreen() {
   const { user, planTier, initialized, setLanguage, setPlanTier } = useAuthStore();
   const { t } = useI18n();
+  const { theme } = useAppTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -499,22 +502,22 @@ export default function ProfileScreen() {
           title: t('Profile'),
           headerTransparent: false,
           headerStyle: {
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.navigation.card,
           },
           headerLeft: () => (
             <TouchableOpacity
-              style={styles.headerButton}
+              style={[styles.headerButton, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}
               onPress={() => router.replace('/(tabs)/settings')}
             >
-              <ArrowLeft size={20} color="#0F172A" />
+              <ArrowLeft size={20} color={theme.navigation.text} />
             </TouchableOpacity>
           ),
           headerRight: () => (
             <TouchableOpacity
-              style={styles.headerButton}
+              style={[styles.headerButton, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}
               onPress={() => router.replace('/(tabs)')}
             >
-              <House size={19} color="#0F172A" />
+              <House size={19} color={theme.navigation.text} />
             </TouchableOpacity>
           ),
         }}
@@ -527,13 +530,19 @@ export default function ProfileScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}
       >
         <RNView style={styles.inlineNavRow}>
-          <TouchableOpacity style={styles.inlineNavButton} onPress={() => router.replace('/(tabs)/settings')}>
-            <ArrowLeft size={16} color="#0F172A" />
-            <Text style={styles.inlineNavButtonText}>Back to settings</Text>
+          <TouchableOpacity
+            style={[styles.inlineNavButton, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}
+            onPress={() => router.replace('/(tabs)/settings')}
+          >
+            <ArrowLeft size={16} color={theme.navigation.text} />
+            <Text style={[styles.inlineNavButtonText, { color: theme.navigation.text }]}>Back to settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.inlineNavButton} onPress={() => router.replace('/(tabs)')}>
-            <House size={16} color="#0F172A" />
-            <Text style={styles.inlineNavButtonText}>Home</Text>
+          <TouchableOpacity
+            style={[styles.inlineNavButton, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}
+            onPress={() => router.replace('/(tabs)')}
+          >
+            <House size={16} color={theme.navigation.text} />
+            <Text style={[styles.inlineNavButtonText, { color: theme.navigation.text }]}>Home</Text>
           </TouchableOpacity>
         </RNView>
 
@@ -743,6 +752,17 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          <RNView style={styles.appearanceSection}>
+            <ThemePreferencePicker
+              title="Theme Mode"
+              description="Choose whether this account stays in light mode, dark mode, or follows the system on this device."
+            />
+            <RNView style={styles.appearanceSpacer} />
+            <ColorPalettePicker
+              description="Pick an accent palette. In dark mode, the base stays neutral gray like the web app."
+            />
+          </RNView>
         </Card>
 
         <TouchableOpacity
@@ -801,7 +821,6 @@ const styles = StyleSheet.create({
   inlineNavButtonText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#0F172A',
   },
   avatarSection: {
     alignItems: 'center',
@@ -1035,6 +1054,15 @@ const styles = StyleSheet.create({
   },
   chips: {
     marginTop: 8,
+  },
+  appearanceSection: {
+    marginTop: 22,
+    paddingTop: 4,
+    backgroundColor: 'transparent',
+  },
+  appearanceSpacer: {
+    height: 18,
+    backgroundColor: 'transparent',
   },
   chip: {
     paddingHorizontal: 14,

@@ -9,11 +9,13 @@ import Animated, {
     Easing
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 const { width, height } = Dimensions.get('window');
 
 export const AnimatedBackground = ({ children, style }: { children: React.ReactNode, style?: any }) => {
     const progress = useSharedValue(0);
+    const { theme } = useAppTheme();
 
     useEffect(() => {
         progress.value = withRepeat(
@@ -40,21 +42,21 @@ export const AnimatedBackground = ({ children, style }: { children: React.ReactN
     });
 
     return (
-        <View style={[styles.container, style]}>
+        <View style={[styles.container, { backgroundColor: theme.backgroundBase }, style]}>
             {/* Abstract Animated Blobs */}
-            <Animated.View style={[styles.blob, styles.blob1, animatedStyle1]}>
+            <Animated.View style={[styles.blob, styles.blob1, { opacity: theme.blobOpacity }, animatedStyle1]}>
                 <LinearGradient
-                    colors={['#4F46E5', '#818CF8']}
+                    colors={theme.blobColorsA}
                     style={styles.gradient}
                 />
             </Animated.View>
-            <Animated.View style={[styles.blob, styles.blob2, animatedStyle2]}>
+            <Animated.View style={[styles.blob, styles.blob2, { opacity: theme.blobOpacity }, animatedStyle2]}>
                 <LinearGradient
-                    colors={['#7C3AED', '#A78BFA']}
+                    colors={theme.blobColorsB}
                     style={styles.gradient}
                 />
             </Animated.View>
-            <View style={styles.overlay} />
+            <View style={[styles.overlay, { backgroundColor: theme.backgroundOverlay }]} />
             <View style={styles.content}>
                 {children}
             </View>
@@ -65,14 +67,12 @@ export const AnimatedBackground = ({ children, style }: { children: React.ReactN
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF', // Clean white background
     },
     blob: {
         position: 'absolute',
         width: width * 0.8,
         height: width * 0.8,
         borderRadius: (width * 0.8) / 2,
-        opacity: 0.15, // Reduced opacity for subtleness
     },
     blob1: {
         top: -width * 0.2,
@@ -88,7 +88,6 @@ const styles = StyleSheet.create({
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(255, 255, 255, 0.4)', // Light white overlay
     },
     content: {
         flex: 1,

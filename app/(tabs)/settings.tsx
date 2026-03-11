@@ -13,6 +13,7 @@ import { getProfileAvatarPublicUrl, isMissingAvatarUrlColumn } from '@/services/
 import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
 import { getDeviceLanguage } from '@/constants/i18n';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
+import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
 
 const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
 
@@ -291,6 +292,12 @@ export default function SettingsScreen() {
                     ))}
                 </Card>
 
+                <Card style={styles.appearanceCard}>
+                    <ThemePreferencePicker />
+                    <RNView style={styles.appearanceSpacer} />
+                    <ColorPalettePicker />
+                </Card>
+
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} disabled={signingOut}>
                     <LogOut size={20} color="#EF4444" />
                     <Text style={styles.signOutText}>{signingOut ? 'Signing Out...' : 'Sign Out'}</Text>
@@ -408,6 +415,14 @@ const styles = StyleSheet.create({
         gap: 10,
         borderWidth: 1,
         borderColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    appearanceCard: {
+        marginBottom: 24,
+        padding: 20,
+    },
+    appearanceSpacer: {
+        height: 18,
+        backgroundColor: 'transparent',
     },
     signOutText: {
         color: '#EF4444',

@@ -7,17 +7,22 @@ if (__DEV__) {
 }
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
+import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SystemUI from 'expo-system-ui';
 
 import { ReferralRewardModal } from '@/components/ReferralRewardModal';
 import { AppBiometricGate } from '@/components/AppBiometricGate';
 import { useAuth } from '@/hooks/useAuth';
-import { useColorScheme } from '@/components/useColorScheme';
+import { useAuthStore } from '@/store/authStore';
+import { useThemeStore } from '@/store/themeStore';
+import { usePaletteStore } from '@/store/paletteStore';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -51,12 +56,44 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
   useAuth(); // Handle redirects based on auth state
+  const userId = useAuthStore((state) => state.user?.id);
+  const hydrateThemePreference = useThemeStore((state) => state.hydrateThemePreference);
+  const hydratePalettePreference = usePaletteStore((state) => state.hydratePalettePreference);
+  const { colorScheme, theme } = useAppTheme();
+  const navigationTheme = colorScheme === 'dark'
+    ? {
+        ...DarkTheme,
+        colors: {
+          ...DarkTheme.colors,
+          ...theme.navigation,
+        },
+      }
+    : {
+        ...DefaultTheme,
+        colors: {
+          ...DefaultTheme.colors,
+          ...theme.navigation,
+        },
+      };
+
+  useEffect(() => {
+    void hydrateThemePreference(userId);
+  }, [hydrateThemePreference, userId]);
+
+  useEffect(() => {
+    void hydratePalettePreference(userId);
+  }, [hydratePalettePreference, userId]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    void SystemUI.setBackgroundColorAsync(theme.systemBackground).catch(() => null);
+  }, [theme.systemBackground]);
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={navigationTheme}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <Stack
           screenOptions={{
             headerTransparent: true,
@@ -86,7 +123,7 @@ function RootLayoutNav() {
               title: 'New Contact',
               headerTransparent: false,
               headerStyle: {
-                backgroundColor: '#fff',
+                backgroundColor: theme.navigation.card,
               },
             }}
           />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BRAND_COLORS, BRAND_GRADIENT, BRAND_NAME, BRAND_TAGLINE } from '@/constants/Brand';
+import { BRAND_COLORS, BRAND_NAME, BRAND_TAGLINE } from '@/constants/Brand';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 type BrandLogoSize = 'sm' | 'md' | 'lg' | number;
 
@@ -26,6 +26,7 @@ export function BrandLogo({
   centered = false,
 }: BrandLogoProps) {
   const markSize = resolveSize(size);
+  const { theme } = useAppTheme();
 
   return (
     <View style={[styles.root, centered && styles.centered]}>
@@ -75,8 +76,8 @@ export function BrandLogo({
 
       {showWordmark ? (
         <View style={[styles.wordmarkBlock, centered && styles.wordmarkCentered]}>
-          <Text style={styles.wordmark}>{BRAND_NAME}</Text>
-          {showTagline ? <Text style={styles.tagline}>{BRAND_TAGLINE}</Text> : null}
+          <Text style={[styles.wordmark, { color: theme.brandWordmark }]}>{BRAND_NAME}</Text>
+          {showTagline ? <Text style={[styles.tagline, { color: theme.brandTagline }]}>{BRAND_TAGLINE}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -142,14 +143,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   wordmark: {
-    color: BRAND_COLORS.ink,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: 0.8,
   },
   tagline: {
     marginTop: 2,
-    color: BRAND_COLORS.slate,
     fontSize: 13,
     fontWeight: '600',
   },

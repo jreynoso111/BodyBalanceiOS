@@ -19,11 +19,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PublicCard, PublicSiteLayout } from '@/components/website/PublicSiteLayout';
 import { AppShowcase } from '@/components/website/AppShowcase';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 const { width } = Dimensions.get('window');
 
 export default function LandingPage() {
     const router = useRouter();
+    const { colorScheme, theme } = useAppTheme();
+    const isDark = colorScheme === 'dark';
     const [activeAppSlide, setActiveAppSlide] = useState(0);
     const [activeNotificationSlide, setActiveNotificationSlide] = useState(0);
 
@@ -331,7 +334,7 @@ export default function LandingPage() {
                         style={styles.logoContainer}
                     >
                         <BrandLogo size="lg" showWordmark centered />
-                        <Text style={styles.subtitle}>Hassle-free lending, for your loved ones.</Text>
+                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>Hassle-free lending, for your loved ones.</Text>
                     </Animated.View>
 
                     <Animated.View
@@ -339,12 +342,14 @@ export default function LandingPage() {
                         style={styles.featuresContainer}
                     >
                         <FeatureItem
-                            icon={<ShieldCheck size={22} color="#1D4ED8" />}
+                            icon={<ShieldCheck size={22} color={isDark ? '#CBD5E1' : '#1D4ED8'} />}
                             text="Secure & Reliable"
+                            isDark={isDark}
                         />
                         <FeatureItem
-                            icon={<Zap size={22} color="#0284C7" />}
+                            icon={<Zap size={22} color={isDark ? '#CBD5E1' : '#0284C7'} />}
                             text="Real-time Management"
+                            isDark={isDark}
                         />
                     </Animated.View>
 
@@ -355,12 +360,13 @@ export default function LandingPage() {
                         <Pressable
                             style={({ pressed }) => [
                                 styles.button,
+                                isDark && styles.buttonDark,
                                 pressed && { transform: [{ scale: 0.98 }] }
                             ]}
                             onPress={() => router.push('/(auth)/login')}
                         >
-                            <Text style={styles.buttonText}>Get Started</Text>
-                            <ArrowRight size={20} color="#FFFFFF" strokeWidth={3} />
+                            <Text style={[styles.buttonText, isDark && styles.buttonTextDark]}>Get Started</Text>
+                            <ArrowRight size={20} color={isDark ? '#F8FAFC' : '#FFFFFF'} strokeWidth={3} />
                         </Pressable>
                     </Animated.View>
                 </View>
@@ -373,18 +379,18 @@ export default function LandingPage() {
     );
 }
 
-function FeatureItem({ icon, text }: { icon: React.ReactNode, text: string }) {
+function FeatureItem({ icon, text, isDark }: { icon: React.ReactNode, text: string; isDark: boolean }) {
     return (
         <LinearGradient
-            colors={['rgba(255,255,255,0.84)', 'rgba(255,255,255,0.50)']}
+            colors={isDark ? ['rgba(15,23,42,0.96)', 'rgba(30,41,59,0.92)'] : ['rgba(255,255,255,0.84)', 'rgba(255,255,255,0.50)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.featureItem}
+            style={[styles.featureItem, isDark && styles.featureItemDark]}
         >
-            <View style={styles.featureIconWrap}>
+            <View style={[styles.featureIconWrap, isDark && styles.featureIconWrapDark]}>
                 {icon}
             </View>
-            <Text style={styles.featureText}>{text}</Text>
+            <Text style={[styles.featureText, isDark && styles.featureTextDark]}>{text}</Text>
         </LinearGradient>
     );
 }
@@ -472,6 +478,12 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 6,
     },
+    featureItemDark: {
+        backgroundColor: '#0F172A',
+        borderColor: '#334155',
+        shadowColor: '#020617',
+        shadowOpacity: 0.3,
+    },
     featureIconWrap: {
         width: 36,
         height: 36,
@@ -482,11 +494,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    featureIconWrapDark: {
+        backgroundColor: '#111827',
+        borderColor: '#334155',
+    },
     featureText: {
         color: '#0F172A',
         fontSize: 16,
         fontWeight: '700',
         marginLeft: 12,
+    },
+    featureTextDark: {
+        color: '#E2E8F0',
     },
     ctaContainer: {
         width: '100%',
@@ -505,10 +524,18 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 10,
     },
+    buttonDark: {
+        backgroundColor: '#334155',
+        shadowColor: '#0F172A',
+        shadowOpacity: 0.24,
+    },
     buttonText: {
         color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '800',
+    },
+    buttonTextDark: {
+        color: '#F8FAFC',
     },
     footer: {
         paddingVertical: 24,
