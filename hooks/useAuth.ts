@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSegments } from 'expo-router';
 import { clearPersistedAuthState, supabase } from '@/services/supabase';
+import { configureBillingForUser } from '@/services/billing';
 import { useAuthStore } from '@/store/authStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceLanguage, normalizeLanguage } from '@/constants/i18n';
@@ -158,8 +159,18 @@ export const useAuth = () => {
                 setUser(session?.user ?? null);
 
                 if (session?.user?.id) {
+                    await configureBillingForUser({
+                        userId: session.user.id,
+                        email: session.user.email ?? null,
+                        phone: session.user.phone ?? null,
+                        displayName:
+                            typeof session.user.user_metadata?.full_name === 'string'
+                                ? session.user.user_metadata.full_name
+                                : null,
+                    });
                     await syncProfileState(session.user.id);
                 } else {
+                    await configureBillingForUser({});
                     setRole(null);
                     setPlanTier('free');
                     setLanguage(getDeviceLanguage());
@@ -188,8 +199,18 @@ export const useAuth = () => {
                 setUser(session?.user ?? null);
 
                 if (session?.user?.id) {
+                    await configureBillingForUser({
+                        userId: session.user.id,
+                        email: session.user.email ?? null,
+                        phone: session.user.phone ?? null,
+                        displayName:
+                            typeof session.user.user_metadata?.full_name === 'string'
+                                ? session.user.user_metadata.full_name
+                                : null,
+                    });
                     await syncProfileState(session.user.id);
                 } else {
+                    await configureBillingForUser({});
                     setRole(null);
                     setPlanTier('free');
                     setLanguage(getDeviceLanguage());

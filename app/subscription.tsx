@@ -5,10 +5,13 @@ import { Check, Shield, Smartphone } from 'lucide-react-native';
 
 import { Card, Screen, Text } from '@/components/Themed';
 import {
+  describePackage,
+  fetchPremiumOffering,
   getBillingEntitlementId,
   getBillingUnavailableReason,
   isBillingAvailable,
   purchasePremiumPackage,
+  restorePremiumAccess,
 } from '@/services/billing';
 import { PLAN_LIMITS } from '@/services/subscriptionPlan';
 import { formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
@@ -22,9 +25,11 @@ export default function SubscriptionScreen() {
   const planTitle = planTier === 'premium' ? 'Premium active' : 'Free plan';
   const unavailableReason = getBillingUnavailableReason();
   const [purchasePending, setPurchasePending] = React.useState(false);
+  const [restorePending, setRestorePending] = React.useState(false);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [sendingInvite, setSendingInvite] = React.useState(false);
   const [referralSummary, setReferralSummary] = React.useState<InviteSummary | null>(null);
+  const [premiumPackageLabel, setPremiumPackageLabel] = React.useState('Google Play lifetime access');
 
   React.useEffect(() => {
     let active = true;
@@ -35,7 +40,20 @@ export default function SubscriptionScreen() {
       setReferralSummary(data);
     };
 
+    const loadPremiumOffering = async () => {
+      if (Platform.OS !== 'android') return;
+      try {
+        const { featuredPackage } = await fetchPremiumOffering();
+        if (!active) return;
+        setPremiumPackageLabel(describePackage(featuredPackage));
+      } catch {
+        if (!active) return;
+        setPremiumPackageLabel('Google Play lifetime access');
+      }
+    };
+
     void loadReferralSummary();
+    void loadPremiumOffering();
 
     return () => {
       active = false;
@@ -53,6 +71,22 @@ export default function SubscriptionScreen() {
       Alert.alert('Purchase unavailable', error?.message || 'Premium checkout is not available right now.');
     } finally {
       setPurchasePending(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (restorePending) return;
+    setRestorePending(true);
+
+    try {
+      const result = await restorePremiumAccess();
+      if (result.synced && result.planTier === 'premium') {
+        Alert.alert('Premium restored', 'Your Google Play purchase was restored on this account.');
+      } else {
+        Alert.alert('Restore unavailable', result.error || 'No eligible Google Play purchase was found.');
+      }
+    } finally {
+      setRestorePending(false);
     }
   };
 
@@ -122,18 +156,9 @@ export default function SubscriptionScreen() {
             <Text style={styles.webPanelTitle}>Current plan</Text>
             <Text style={styles.webPlanValue}>{planTitle}</Text>
             <Text style={styles.webBody}>
-              Buddy Balance Pro removes the friend and active record limits. Android checkout will be handled directly by Google Play when store billing is fully wired.
+              Buddy Balance Pro removes the friend and active record limits. Premium purchases are handled in the Android app through Google Play.
             </Text>
-            {planTier !== 'premium' ? (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={[styles.webPrimaryButton, purchasePending && styles.buttonDisabled]}
-                onPress={() => void handlePurchase()}
-                disabled={purchasePending}
-              >
-                {purchasePending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.webPrimaryButtonText}>Try Premium</Text>}
-              </TouchableOpacity>
-            ) : null}
+            {planTier !== 'premium' ? <Text style={styles.webBody}>To purchase Premium right now, open the Android app and complete checkout with Google Play.</Text> : null}
           </Card>
 
           <Card style={styles.webPanel}>
@@ -203,8 +228,7 @@ export default function SubscriptionScreen() {
           <Text style={styles.heroEyebrow}>Plan</Text>
           <Text style={styles.heroTitle}>{planTitle}</Text>
           <Text style={styles.heroText}>
-            Buddy Balance Pro removes the friend and active record limits. Android checkout will be handled directly by Google
-            Play.
+            Buddy Balance Pro removes the friend and active record limits. {premiumPackageLabel}.
           </Text>
           {planTier !== 'premium' ? (
             <RNView style={styles.ctaGroup}>
@@ -217,8 +241,19 @@ export default function SubscriptionScreen() {
                 {purchasePending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Buy Premium</Text>}
               </TouchableOpacity>
 
+              {Platform.OS === 'android' ? (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={[styles.secondaryButton, restorePending && styles.buttonDisabled]}
+                  onPress={() => void handleRestore()}
+                  disabled={restorePending}
+                >
+                  {restorePending ? <ActivityIndicator size="small" color="#4F46E5" /> : <Text style={styles.secondaryButtonText}>Restore purchase</Text>}
+                </TouchableOpacity>
+              ) : null}
+
               {isBillingAvailable() ? (
-                <Text style={styles.ctaHint}>Use this screen to start Premium checkout directly from the app.</Text>
+                <Text style={styles.ctaHint}>Use Google Play to buy or restore Premium directly from this screen.</Text>
               ) : (
                 <Text style={styles.ctaHint}>{unavailableReason}</Text>
               )}
@@ -248,15 +283,14 @@ export default function SubscriptionScreen() {
           <RNView style={styles.statusIcon}>
             <Shield size={20} color="#1E293B" />
           </RNView>
-          <Text style={styles.stateTitle}>Direct store billing is not live yet</Text>
+          <Text style={styles.stateTitle}>{isBillingAvailable() ? 'Google Play billing is ready' : 'Billing status'}</Text>
           <Text style={styles.stateText}>
             {isBillingAvailable()
-              ? 'Google Play will handle Premium purchases directly. Until that checkout is wired, admins can switch users between Free and Premium from the admin dashboard.'
+              ? 'Premium purchases and restores now run through Google Play on Android. The server validates the purchase token before the app marks this account as Premium.'
               : unavailableReason}
           </Text>
           <Text style={styles.stateFootnote}>
-            Current status: Premium access is controlled by `profiles.plan_tier` and can still be managed manually by an
-            administrator.
+            Current status: the app expects the Android product id `EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID` and validates completed purchases through the `google-play-sync` Supabase function.
           </Text>
           {referralSummary ? (
             <Text style={styles.androidHint}>
@@ -265,11 +299,7 @@ export default function SubscriptionScreen() {
                 : `${referralSummary.referralCount}/3 invite code uses earned toward your next free Premium month.`}
             </Text>
           ) : null}
-          {Platform.OS === 'android' ? (
-            <Text style={styles.androidHint}>
-              Next step for Android: connect the Google Play in-app product and wire the purchase flow into this screen.
-            </Text>
-          ) : null}
+          {Platform.OS === 'android' && isBillingAvailable() ? <Text style={styles.androidHint}>Premium SKU: {getBillingEntitlementId()}</Text> : null}
         </Card>
 
         {planTier !== 'premium' && referralSummary ? (

@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { supabase } from './supabase';
 import { Alert } from 'react-native';
+import { escapeCsvCell } from './csv';
 
 export const exportLoansToCSV = async (userId: string) => {
     try {
@@ -20,8 +21,17 @@ export const exportLoansToCSV = async (userId: string) => {
         const header = 'ID,Contact,Amount,Type,Status,Description,Due Date,Created At\n';
         const rows = data.map(loan => {
             const contactName = loan.contacts?.name || 'Unknown';
-            const description = (loan.description || '').replace(/,/g, ' ');
-            return `${loan.id},"${contactName}",${loan.amount},${loan.type},${loan.status},"${description}",${loan.due_date || ''},${loan.created_at}`;
+            const description = loan.description || '';
+            return [
+                escapeCsvCell(loan.id),
+                escapeCsvCell(contactName),
+                escapeCsvCell(loan.amount),
+                escapeCsvCell(loan.type),
+                escapeCsvCell(loan.status),
+                escapeCsvCell(description),
+                escapeCsvCell(loan.due_date || ''),
+                escapeCsvCell(loan.created_at),
+            ].join(',');
         }).join('\n');
 
         const csvContent = header + rows;

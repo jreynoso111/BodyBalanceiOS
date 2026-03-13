@@ -1,6 +1,7 @@
 import { supabase } from '@/services/supabase';
+import { hasReferralPremiumAccessAt, normalizePlanTierValue, type PlanTier } from '@/services/subscriptionPlanUtils';
 
-export type PlanTier = 'free' | 'premium';
+export type { PlanTier } from '@/services/subscriptionPlanUtils';
 
 export const PLAN_LIMITS = {
   free: {
@@ -14,18 +15,11 @@ export const PLAN_LIMITS = {
 } as const;
 
 export function hasReferralPremiumAccess(premiumReferralExpiresAt?: string | null) {
-  if (!premiumReferralExpiresAt) return false;
-  const expiresAt = new Date(premiumReferralExpiresAt);
-  if (Number.isNaN(expiresAt.getTime())) return false;
-  return expiresAt.getTime() > Date.now();
+  return hasReferralPremiumAccessAt(premiumReferralExpiresAt);
 }
 
 export function normalizePlanTier(value?: string | null, premiumReferralExpiresAt?: string | null): PlanTier {
-  if (String(value || '').toLowerCase().trim() === 'premium') {
-    return 'premium';
-  }
-
-  return hasReferralPremiumAccess(premiumReferralExpiresAt) ? 'premium' : 'free';
+  return normalizePlanTierValue(value, premiumReferralExpiresAt);
 }
 
 export function getPlanLabel(plan: PlanTier) {

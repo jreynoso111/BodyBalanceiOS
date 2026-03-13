@@ -26,6 +26,7 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
+      "expo-iap",
       "expo-sharing",
       [
         "expo-image-picker",

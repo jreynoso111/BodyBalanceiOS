@@ -14,6 +14,17 @@
 2. Fill in your project values.
 3. Keep `.env` out of git (already ignored in `.gitignore`).
 
+For the public contact relay, also configure:
+
+- `PUBLIC_CONTACT_ALLOWED_ORIGINS`
+- `TURNSTILE_SECRET_KEY`
+- `EXPO_PUBLIC_TURNSTILE_SITE_KEY`
+- `PUBLIC_CONTACT_WINDOW_MINUTES`
+- `PUBLIC_CONTACT_MAX_IP_ATTEMPTS`
+- `PUBLIC_CONTACT_MAX_EMAIL_ATTEMPTS`
+
+Default allowed origins in the function include `https://buddybalance.net`, `https://www.buddybalance.net`, and local development hosts. Override them if your production web domain differs.
+
 ## 3) Session storage
 
 - On mobile, auth session tokens are stored in `expo-secure-store` (encrypted at rest).

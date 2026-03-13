@@ -5,6 +5,23 @@ import { Text } from '@/components/Themed';
 import { supabase } from '@/services/supabase';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TURNSTILE_SITE_KEY = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY || '';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: {
+        sitekey: string;
+        callback: (token: string) => void;
+        'expired-callback'?: () => void;
+        'error-callback'?: () => void;
+        theme?: 'light' | 'dark' | 'auto';
+      }) => string | number;
+      reset: (widgetId?: string | number) => void;
+      remove?: (widgetId?: string | number) => void;
+    };
+  }
+}
 
 type FormState = {
   name: string;
@@ -27,6 +44,65 @@ export function PublicContactForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [captchaReady, setCaptchaReady] = useState(Platform.OS !== 'web' || !TURNSTILE_SITE_KEY);
+  const turnstileContainerRef = React.useRef<any>(null);
+  const turnstileWidgetIdRef = React.useRef<string | number | null>(null);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || !TURNSTILE_SITE_KEY) return;
+    if (typeof document === 'undefined') return;
+
+    let active = true;
+
+    const renderWidget = () => {
+      if (!active || !window.turnstile || !turnstileContainerRef.current || turnstileWidgetIdRef.current !== null) return;
+
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current as HTMLElement, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token: string) => {
+          if (!active) return;
+          setTurnstileToken(token);
+          setCaptchaReady(true);
+        },
+        'expired-callback': () => {
+          if (!active) return;
+          setTurnstileToken('');
+          setCaptchaReady(false);
+        },
+        'error-callback': () => {
+          if (!active) return;
+          setTurnstileToken('');
+          setCaptchaReady(false);
+        },
+        theme: 'light',
+      });
+    };
+
+    const existingScript = document.querySelector('script[data-turnstile="true"]') as HTMLScriptElement | null;
+    if (existingScript) {
+      renderWidget();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.dataset.turnstile = 'true';
+      script.onload = () => renderWidget();
+      document.head.appendChild(script);
+    }
+
+    const interval = window.setInterval(renderWidget, 250);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      if (window.turnstile && turnstileWidgetIdRef.current !== null) {
+        window.turnstile.remove?.(turnstileWidgetIdRef.current);
+      }
+      turnstileWidgetIdRef.current = null;
+    };
+  }, []);
 
   const updateField = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -56,6 +132,11 @@ export function PublicContactForm() {
       return;
     }
 
+    if (Platform.OS === 'web' && TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError('Complete the CAPTCHA before sending your message.');
+      return;
+    }
+
     setLoading(true);
     const { error: invokeError } = await supabase.functions.invoke('public-contact', {
       body: {
@@ -65,6 +146,7 @@ export function PublicContactForm() {
         message,
         website: form.website,
         source: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.href : 'app',
+        turnstileToken,
       },
     });
     setLoading(false);
@@ -75,6 +157,11 @@ export function PublicContactForm() {
     }
 
     setForm(INITIAL_FORM);
+    setTurnstileToken('');
+    if (Platform.OS === 'web' && TURNSTILE_SITE_KEY && window.turnstile && turnstileWidgetIdRef.current !== null) {
+      window.turnstile.reset(turnstileWidgetIdRef.current);
+      setCaptchaReady(false);
+    }
     setSuccess('Message sent. Buddy Balance support will receive it by email.');
   };
 
@@ -131,10 +218,16 @@ export function PublicContactForm() {
         autoCapitalize="none"
       />
 
+      {Platform.OS === 'web' && TURNSTILE_SITE_KEY ? <View ref={turnstileContainerRef} style={styles.captchaBox} /> : null}
+
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {success ? <Text style={styles.successText}>{success}</Text> : null}
 
-      <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} disabled={loading} onPress={() => void submit()}>
+      <TouchableOpacity
+        style={[styles.button, (loading || !captchaReady) && styles.buttonDisabled]}
+        disabled={loading || !captchaReady}
+        onPress={() => void submit()}
+      >
         {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.buttonText}>Send message</Text>}
       </TouchableOpacity>
     </View>
@@ -205,6 +298,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#5B63FF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  captchaBox: {
+    minHeight: 65,
+    marginBottom: 12,
   },
   buttonDisabled: {
     opacity: 0.75,
