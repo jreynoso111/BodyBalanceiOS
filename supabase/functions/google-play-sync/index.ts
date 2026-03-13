@@ -102,6 +102,34 @@ async function fetchProductPurchase({
   return response.json();
 }
 
+async function fetchInAppProduct({
+  packageName,
+  productId,
+}: {
+  packageName: string;
+  productId: string;
+}) {
+  const accessToken = await getGoogleAccessToken();
+  const url =
+    `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}` +
+    `/inappproducts/${encodeURIComponent(productId)}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Google Play product lookup failed (${response.status}): ${errorText}`);
+  }
+
+  return response.json();
+}
+
 function resolvePlanTierFromGooglePurchase(purchase: any) {
   // Check the raw numeric state first (Google Play ProductPurchase returns integer 0 for purchased).
   if (purchase?.purchaseState === 0) {
@@ -183,6 +211,7 @@ Deno.serve(async (req) => {
     const productId = String(body?.product_id || '').trim();
     const purchaseToken = String(body?.purchase_token || '').trim();
     const isSubscription = Boolean(body?.is_subscription);
+    const mode = String(body?.mode || '').trim().toLowerCase();
 
     if (isSubscription) {
       return json({ error: 'This function currently validates one-time Google Play products only.' }, 400);
@@ -202,6 +231,22 @@ Deno.serve(async (req) => {
 
     if (GOOGLE_PLAY_ALLOWED_PRODUCT_IDS.length > 0 && !GOOGLE_PLAY_ALLOWED_PRODUCT_IDS.includes(productId)) {
       return json({ error: 'product_id is not allowed for Premium activation.' }, 400);
+    }
+
+    if (mode === 'health') {
+      const product = await fetchInAppProduct({
+        packageName,
+        productId,
+      });
+
+      return json({
+        ok: true,
+        ready: true,
+        appUserId: authData.user.id,
+        packageName,
+        productId,
+        productStatus: product?.status || product?.purchaseType || null,
+      });
     }
 
     if (!purchaseToken) {

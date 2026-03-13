@@ -2,12 +2,11 @@ import * as Device from 'expo-device';
 import { Platform, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { getOrCreateUserPreferences } from '@/services/userPreferences';
+import { buildReminderMessage, type ReminderCategory, type ReminderDirection } from '@/services/notificationUtils';
 import { supabase } from '@/services/supabase';
 
 const isWeb = Platform.OS === 'web';
 const isAndroidExpoGo = Platform.OS === 'android' && Constants.appOwnership === 'expo';
-type ReminderCategory = 'money' | 'item';
-type ReminderDirection = 'lent' | 'borrowed';
 
 type ReminderScheduleOptions = {
     loanId: string;
@@ -111,50 +110,6 @@ function getExpoProjectId() {
         process.env.EXPO_PUBLIC_EAS_PROJECT_ID ||
         null
     );
-}
-
-function formatReminderAmount(amount: number, currency?: string | null) {
-    const formattedAmount = amount.toLocaleString();
-    return currency ? `${currency} ${formattedAmount}` : `$${formattedAmount}`;
-}
-
-function buildReminderMessage(options: {
-    category: ReminderCategory;
-    direction: ReminderDirection;
-    contactName: string;
-    amount: number;
-    currency?: string | null;
-    itemName?: string | null;
-}) {
-    const label = options.itemName?.trim() || 'the item';
-
-    if (options.category === 'item') {
-        if (options.direction === 'borrowed') {
-            return {
-                title: 'Return Reminder! 📦',
-                body: `Reminder: return ${label} to ${options.contactName}.`,
-            };
-        }
-
-        return {
-            title: 'Return Reminder! 📦',
-            body: `Reminder: ${options.contactName} should return ${label} to you.`,
-        };
-    }
-
-    const formattedAmount = formatReminderAmount(options.amount, options.currency);
-
-    if (options.direction === 'borrowed') {
-        return {
-            title: 'Repayment Reminder! 💸',
-            body: `Reminder: you owe ${options.contactName} ${formattedAmount}.`,
-        };
-    }
-
-    return {
-        title: 'Payment Reminder! 💰',
-        body: `Reminder: ${options.contactName} owes you ${formattedAmount}.`,
-    };
 }
 
 async function savePushToken(userId: string, token: string | null) {

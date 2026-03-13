@@ -29,6 +29,12 @@ type BillingSyncResult = {
   error?: string;
 };
 
+type BillingReadinessResult = {
+  available: boolean;
+  ready: boolean;
+  reason: string | null;
+};
+
 type PremiumOffering = {
   offering: {
     id: string;
@@ -163,6 +169,39 @@ async function syncGooglePlayPurchase({ productId, purchaseToken }: SyncPurchase
   };
 }
 
+async function fetchGooglePlayBillingHealth(): Promise<BillingReadinessResult> {
+  const { data, error } = await supabase.functions.invoke('google-play-sync', {
+    body: {
+      mode: 'health',
+      package_name: ANDROID_PACKAGE_NAME,
+      product_id: ANDROID_PREMIUM_PRODUCT_ID,
+      is_subscription: false,
+    },
+  });
+
+  if (error) {
+    return {
+      available: true,
+      ready: false,
+      reason: error.message || 'Google Play billing backend is not responding correctly.',
+    };
+  }
+
+  if (!data?.ok || !data?.ready) {
+    return {
+      available: true,
+      ready: false,
+      reason: typeof data?.error === 'string' ? data.error : 'Google Play billing backend is not ready.',
+    };
+  }
+
+  return {
+    available: true,
+    ready: true,
+    reason: null,
+  };
+}
+
 export function isBillingAvailable() {
   return Platform.OS === 'android' && hasAndroidBillingConfig();
 }
@@ -181,6 +220,43 @@ export function getBillingUnavailableReason() {
 
 export function getBillingEntitlementId() {
   return ANDROID_PREMIUM_PRODUCT_ID || 'premium';
+}
+
+export async function getBillingReadiness(): Promise<BillingReadinessResult> {
+  if (Platform.OS !== 'android') {
+    return {
+      available: false,
+      ready: false,
+      reason: getBillingUnavailableReason(),
+    };
+  }
+
+  if (!hasAndroidBillingConfig()) {
+    return {
+      available: false,
+      ready: false,
+      reason: getMissingAndroidBillingConfigReason(),
+    };
+  }
+
+  try {
+    const connectionReady = await ensureBillingConnection();
+    if (!connectionReady) {
+      return {
+        available: true,
+        ready: false,
+        reason: 'Google Play Billing could not connect on this device.',
+      };
+    }
+  } catch (error) {
+    return {
+      available: true,
+      ready: false,
+      reason: normalizePurchaseError(error),
+    };
+  }
+
+  return fetchGooglePlayBillingHealth();
 }
 
 export async function getPlanTierFromCustomerInfo() {

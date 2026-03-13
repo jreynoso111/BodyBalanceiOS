@@ -7,6 +7,7 @@ import { Card, Screen, Text } from '@/components/Themed';
 import {
   describePackage,
   fetchPremiumOffering,
+  getBillingReadiness,
   getBillingEntitlementId,
   getBillingUnavailableReason,
   isBillingAvailable,
@@ -30,6 +31,9 @@ export default function SubscriptionScreen() {
   const [sendingInvite, setSendingInvite] = React.useState(false);
   const [referralSummary, setReferralSummary] = React.useState<InviteSummary | null>(null);
   const [premiumPackageLabel, setPremiumPackageLabel] = React.useState('Google Play lifetime access');
+  const [billingReady, setBillingReady] = React.useState(false);
+  const [billingStatusLoading, setBillingStatusLoading] = React.useState(Platform.OS === 'android' && isBillingAvailable());
+  const [billingStatusReason, setBillingStatusReason] = React.useState<string | null>(unavailableReason);
 
   React.useEffect(() => {
     let active = true;
@@ -52,8 +56,28 @@ export default function SubscriptionScreen() {
       }
     };
 
+    const loadBillingReadiness = async () => {
+      if (Platform.OS !== 'android') return;
+      setBillingStatusLoading(true);
+      try {
+        const readiness = await getBillingReadiness();
+        if (!active) return;
+        setBillingReady(readiness.ready);
+        setBillingStatusReason(readiness.reason);
+      } catch (error: any) {
+        if (!active) return;
+        setBillingReady(false);
+        setBillingStatusReason(error?.message || 'Google Play billing backend is not ready.');
+      } finally {
+        if (active) {
+          setBillingStatusLoading(false);
+        }
+      }
+    };
+
     void loadReferralSummary();
     void loadPremiumOffering();
+    void loadBillingReadiness();
 
     return () => {
       active = false;
@@ -234,9 +258,9 @@ export default function SubscriptionScreen() {
             <RNView style={styles.ctaGroup}>
               <TouchableOpacity
                 activeOpacity={0.9}
-                style={[styles.primaryButton, purchasePending && styles.buttonDisabled]}
+                style={[styles.primaryButton, (purchasePending || (Platform.OS === 'android' && !billingReady)) && styles.buttonDisabled]}
                 onPress={() => void handlePurchase()}
-                disabled={purchasePending}
+                disabled={purchasePending || (Platform.OS === 'android' && !billingReady)}
               >
                 {purchasePending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Buy Premium</Text>}
               </TouchableOpacity>
@@ -244,18 +268,20 @@ export default function SubscriptionScreen() {
               {Platform.OS === 'android' ? (
                 <TouchableOpacity
                   activeOpacity={0.9}
-                  style={[styles.secondaryButton, restorePending && styles.buttonDisabled]}
+                  style={[styles.secondaryButton, (restorePending || !billingReady) && styles.buttonDisabled]}
                   onPress={() => void handleRestore()}
-                  disabled={restorePending}
+                  disabled={restorePending || !billingReady}
                 >
                   {restorePending ? <ActivityIndicator size="small" color="#4F46E5" /> : <Text style={styles.secondaryButtonText}>Restore purchase</Text>}
                 </TouchableOpacity>
               ) : null}
 
-              {isBillingAvailable() ? (
+              {Platform.OS === 'android' && billingStatusLoading ? (
+                <Text style={styles.ctaHint}>Checking Google Play billing readiness…</Text>
+              ) : isBillingAvailable() && billingReady ? (
                 <Text style={styles.ctaHint}>Use Google Play to buy or restore Premium directly from this screen.</Text>
               ) : (
-                <Text style={styles.ctaHint}>{unavailableReason}</Text>
+                <Text style={styles.ctaHint}>{billingStatusReason || unavailableReason}</Text>
               )}
             </RNView>
           ) : null}
@@ -283,11 +309,15 @@ export default function SubscriptionScreen() {
           <RNView style={styles.statusIcon}>
             <Shield size={20} color="#1E293B" />
           </RNView>
-          <Text style={styles.stateTitle}>{isBillingAvailable() ? 'Google Play billing is ready' : 'Billing status'}</Text>
+          <Text style={styles.stateTitle}>
+            {billingStatusLoading ? 'Checking billing status' : billingReady ? 'Google Play billing is ready' : 'Billing status'}
+          </Text>
           <Text style={styles.stateText}>
-            {isBillingAvailable()
+            {billingStatusLoading
+              ? 'The app is verifying the Google Play connection and backend validation before enabling checkout.'
+              : billingReady
               ? 'Premium purchases and restores now run through Google Play on Android. The server validates the purchase token before the app marks this account as Premium.'
-              : unavailableReason}
+              : billingStatusReason || unavailableReason}
           </Text>
           <Text style={styles.stateFootnote}>
             Current status: the app expects the Android product id `EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID` and validates completed purchases through the `google-play-sync` Supabase function.

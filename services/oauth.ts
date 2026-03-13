@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { waitForAuthSession } from '@/services/authSession';
+import { mapGoogleOAuthError, readOAuthParam } from '@/services/oauthUtils';
 import { supabase } from '@/services/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -31,40 +32,6 @@ export function getGoogleOAuthUnavailableReason() {
   return 'Google sign in is not available inside Expo Go. Use a development build or the production app for Google authentication.';
 }
 
-function mapGoogleOAuthError(rawMessage?: string): string {
-  const message = (rawMessage || '').trim();
-  const normalized = message.toLowerCase();
-
-  if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) {
-    return 'Google sign-in is not enabled in Supabase yet. Enable Google in Auth Providers and add a valid Google Client ID/Secret.';
-  }
-
-  if (normalized.includes('invalid redirect') || normalized.includes('redirect_uri_mismatch')) {
-    return 'Google sign-in redirect URL is not configured correctly. Verify your Supabase Auth redirect URLs and Google OAuth redirect URIs.';
-  }
-
-  if (normalized.includes('invalid client') || normalized.includes('client id')) {
-    return 'Google OAuth client configuration is invalid. Verify the Google Client ID and Client Secret in Supabase Auth Providers.';
-  }
-
-  return message || 'Google sign in failed. Please try again.';
-}
-
-function readParam(url: string, key: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const queryValue = parsed.searchParams.get(key);
-    if (queryValue) return queryValue;
-
-    const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
-    if (!hash) return null;
-    const hashParams = new URLSearchParams(hash);
-    return hashParams.get(key);
-  } catch {
-    return null;
-  }
-}
-
 function getGoogleRedirectUrl() {
   const isExpoGo = Constants.appOwnership === 'expo';
   const appScheme =
@@ -82,7 +49,7 @@ function getGoogleRedirectUrl() {
 }
 
 export async function completeOAuthFromUrl(url: string): Promise<GoogleAuthResult> {
-  const code = readParam(url, 'code');
+  const code = readOAuthParam(url, 'code');
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
@@ -97,8 +64,8 @@ export async function completeOAuthFromUrl(url: string): Promise<GoogleAuthResul
     return { status: 'success' };
   }
 
-  const accessToken = readParam(url, 'access_token');
-  const refreshToken = readParam(url, 'refresh_token');
+  const accessToken = readOAuthParam(url, 'access_token');
+  const refreshToken = readOAuthParam(url, 'refresh_token');
   if (accessToken && refreshToken) {
     const { error } = await supabase.auth.setSession({
       access_token: accessToken,
@@ -116,7 +83,7 @@ export async function completeOAuthFromUrl(url: string): Promise<GoogleAuthResul
     return { status: 'success' };
   }
 
-  const oauthError = readParam(url, 'error_description') || readParam(url, 'error');
+  const oauthError = readOAuthParam(url, 'error_description') || readOAuthParam(url, 'error');
   if (oauthError) {
     return { status: 'error', message: mapGoogleOAuthError(oauthError) };
   }

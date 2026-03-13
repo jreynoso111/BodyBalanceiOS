@@ -10,9 +10,10 @@
     "ios:release:sim": "bash ./scripts/run-ios-release-sim.sh",
     "ios:device": "expo run:ios --device",
     "test": "jest --runInBand",
+    "test:critical": "jest --runInBand --coverage=false",
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
-    "verify:release": "npm run test && npm run typecheck && npm run doctor",
+    "verify:release": "npm run test:critical && npm run typecheck && npm run doctor",
     "deploy:admin-user-management": "supabase functions deploy admin-user-management --no-verify-jwt",
     "deploy:google-play-sync": "supabase functions deploy google-play-sync --no-verify-jwt"
   },
