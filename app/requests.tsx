@@ -7,35 +7,16 @@ import { useAuthStore } from '@/store/authStore';
 import { Stack } from 'expo-router';
 import { Check, X, Bell, ArrowDownLeft, Wallet, UserPlus } from 'lucide-react-native';
 import { useI18n } from '@/hooks/useI18n';
+import {
+    buildMergeChoiceConfirmationMessage,
+    formatMergeChoiceSummary,
+    getDisplayName,
+    getMergeCancelMessage,
+    getMergeChoiceOptions,
+    getRequestActionMessage,
+    getRequestTypeLabel,
+} from '@/services/requestUtils';
 import { getRequestedLoanAmount } from '@/utils/p2pRequests';
-
-function getRequestTypeLabel(type: string) {
-    if (type === 'friend_request') return 'Friend request';
-    if (type === 'loan_validation') return 'Shared record confirmation';
-    if (type === 'payment_validation') return 'Payment confirmation';
-    if (type === 'debt_reduction') return 'Adjustment request';
-    return 'Shared update';
-}
-
-function getRequestActionMessage(type: string, action: 'approved' | 'rejected') {
-    if (action === 'approved') {
-        if (type === 'friend_request') return 'You are now connected as friends.';
-        if (type === 'loan_validation') return 'The shared record has been confirmed.';
-        if (type === 'payment_validation') return 'The payment update has been confirmed.';
-        if (type === 'debt_reduction') return 'The new total has been saved.';
-        return 'The update has been confirmed.';
-    }
-
-    if (type === 'friend_request') return 'The friend request was declined.';
-    if (type === 'loan_validation') return 'The shared record was declined.';
-    if (type === 'payment_validation') return 'The payment update was declined.';
-    if (type === 'debt_reduction') return 'The adjustment request was declined.';
-    return 'The update was declined.';
-}
-
-function getDisplayName(request: any) {
-    return request?.request_payload?.sender_name || request?.from_profile?.full_name || request?.from_profile?.email || 'Someone';
-}
 
 export default function RequestsScreen() {
     const { user } = useAuthStore();
@@ -260,12 +241,93 @@ export default function RequestsScreen() {
         }
     };
 
+    const resolveMergeChoice = async (request: any, keepUserId: string) => {
+        setLoading(true);
+
+        try {
+            const { error } = await supabase.rpc('resolve_friend_merge_choice', {
+                p_request_id: request.id,
+                p_keep_user_id: keepUserId,
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            Alert.alert('Success', getRequestActionMessage('friend_merge_choice', 'approved'));
+            await fetchRequests();
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'Something went wrong while merging these histories.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const cancelMergeChoice = async (request: any) => {
+        setLoading(true);
+
+        try {
+            const { error } = await supabase.rpc('cancel_friend_merge_choice', {
+                p_request_id: request.id,
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            Alert.alert('Canceled', getRequestActionMessage('friend_merge_choice', 'rejected'));
+            await fetchRequests();
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'Something went wrong while canceling this merge.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleMergeChoicePress = (request: any, keepUserId: string, keepLabel: string) => {
+        const confirmation = buildMergeChoiceConfirmationMessage(request, keepUserId, keepLabel, user?.id);
+
+        Alert.alert(
+            confirmation.title,
+            confirmation.message,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: `Keep ${keepLabel}`,
+                    style: 'destructive',
+                    onPress: () => {
+                        void resolveMergeChoice(request, keepUserId);
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleMergeCancelPress = (request: any) => {
+        const confirmation = getMergeCancelMessage();
+
+        Alert.alert(
+            confirmation.title,
+            confirmation.message,
+            [
+                { text: 'Keep reviewing', style: 'cancel' },
+                {
+                    text: 'Cancel merge',
+                    style: 'destructive',
+                    onPress: () => {
+                        void cancelMergeChoice(request);
+                    },
+                },
+            ]
+        );
+    };
+
     const handleAction = async (request: any, action: 'approved' | 'rejected') => {
         setLoading(true);
 
         try {
             if (request.type === 'friend_request') {
-                const { error } = await supabase.rpc('resolve_friend_request', {
+                const { data, error } = await supabase.rpc('resolve_friend_request_v2', {
                     p_request_id: request.id,
                     p_action: action,
                 });
@@ -274,7 +336,16 @@ export default function RequestsScreen() {
                     throw error;
                 }
 
-                Alert.alert('Success', getRequestActionMessage(request.type, action));
+                if (action === 'approved' && data?.status === 'merge_required') {
+                    const leftLabel = String(data?.user_a_name || 'the first user');
+                    const rightLabel = String(data?.user_b_name || 'the second user');
+                    Alert.alert(
+                        'Separate histories found',
+                        `${leftLabel} and ${rightLabel} already track each other separately. Review the new request below and choose which history to keep before shared records continue.`
+                    );
+                } else {
+                    Alert.alert('Success', getRequestActionMessage(request.type, action));
+                }
                 await fetchRequests();
                 return;
             }
@@ -303,12 +374,44 @@ export default function RequestsScreen() {
         }
     };
 
+    const renderMergeChoiceItem = (item: any) => {
+        const options = getMergeChoiceOptions(item);
+
+        return (
+            <RNView style={styles.mergeChoiceSection}>
+                {options.map((option) => (
+                    <RNView key={option.userId} style={styles.mergeOptionCard}>
+                        <Text style={styles.mergeOptionTitle}>{option.label}</Text>
+                        <Text style={styles.mergeOptionSummary}>{formatMergeChoiceSummary(option.summary)}</Text>
+                        <TouchableOpacity
+                            style={[styles.actionBtn, styles.mergeApproveBtn]}
+                            onPress={() => handleMergeChoicePress(item, option.userId, option.label)}
+                            disabled={loading}
+                        >
+                            <Check size={18} color="#fff" />
+                            <Text style={styles.approveText}>Keep {option.label}</Text>
+                        </TouchableOpacity>
+                    </RNView>
+                ))}
+                <TouchableOpacity
+                    style={[styles.actionBtn, styles.mergeCancelBtn]}
+                    onPress={() => handleMergeCancelPress(item)}
+                    disabled={loading}
+                >
+                    <X size={18} color="#9F1239" />
+                    <Text style={styles.mergeCancelText}>Cancel for now</Text>
+                </TouchableOpacity>
+            </RNView>
+        );
+    };
+
     const renderRequestItem = ({ item }: { item: any }) => (
         <Card style={styles.requestCard}>
             <RNView style={styles.requestHeader}>
                 <RNView style={styles.iconContainer}>
                     {item.type === 'loan_validation' ? <Wallet size={20} color="#6366F1" /> :
                         item.type === 'friend_request' ? <UserPlus size={20} color="#4F46E5" /> :
+                        item.type === 'friend_merge_choice' ? <UserPlus size={20} color="#B45309" /> :
                         item.type === 'payment_validation' ? <Check size={20} color="#10B981" /> :
                             <ArrowDownLeft size={20} color="#F59E0B" />}
                 </RNView>
@@ -320,24 +423,26 @@ export default function RequestsScreen() {
 
             <Text style={styles.requestMessage}>{item.message}</Text>
 
-            <RNView style={styles.actionButtons}>
-                <TouchableOpacity
-                    style={[styles.actionBtn, styles.rejectBtn]}
-                    onPress={() => handleAction(item, 'rejected')}
-                    disabled={loading}
-                >
-                    <X size={18} color="#EF4444" />
-                    <Text style={styles.rejectText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.actionBtn, styles.approveBtn]}
-                    onPress={() => handleAction(item, 'approved')}
-                    disabled={loading}
-                >
-                    <Check size={18} color="#fff" />
-                    <Text style={styles.approveText}>Confirm</Text>
-                </TouchableOpacity>
-            </RNView>
+            {item.type === 'friend_merge_choice' ? renderMergeChoiceItem(item) : (
+                <RNView style={styles.actionButtons}>
+                    <TouchableOpacity
+                        style={[styles.actionBtn, styles.rejectBtn]}
+                        onPress={() => handleAction(item, 'rejected')}
+                        disabled={loading}
+                    >
+                        <X size={18} color="#EF4444" />
+                        <Text style={styles.rejectText}>Decline</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.actionBtn, styles.approveBtn]}
+                        onPress={() => handleAction(item, 'approved')}
+                        disabled={loading}
+                    >
+                        <Check size={18} color="#fff" />
+                        <Text style={styles.approveText}>Confirm</Text>
+                    </TouchableOpacity>
+                </RNView>
+            )}
         </Card>
     );
 
@@ -424,6 +529,28 @@ const styles = StyleSheet.create({
         gap: 12,
         backgroundColor: 'transparent',
     },
+    mergeChoiceSection: {
+        gap: 12,
+        backgroundColor: 'transparent',
+    },
+    mergeOptionCard: {
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(180, 83, 9, 0.14)',
+        backgroundColor: '#FFF7ED',
+        gap: 10,
+    },
+    mergeOptionTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#9A3412',
+    },
+    mergeOptionSummary: {
+        fontSize: 13,
+        lineHeight: 18,
+        color: '#7C2D12',
+    },
     actionBtn: {
         flex: 1,
         flexDirection: 'row',
@@ -435,6 +562,14 @@ const styles = StyleSheet.create({
     },
     approveBtn: {
         backgroundColor: '#0F172A',
+    },
+    mergeApproveBtn: {
+        backgroundColor: '#9A3412',
+    },
+    mergeCancelBtn: {
+        backgroundColor: 'rgba(244, 63, 94, 0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(244, 63, 94, 0.18)',
     },
     rejectBtn: {
         backgroundColor: 'rgba(239, 68, 68, 0.05)',
@@ -448,6 +583,11 @@ const styles = StyleSheet.create({
     },
     rejectText: {
         color: '#EF4444',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+    mergeCancelText: {
+        color: '#9F1239',
         fontWeight: '700',
         fontSize: 14,
     },

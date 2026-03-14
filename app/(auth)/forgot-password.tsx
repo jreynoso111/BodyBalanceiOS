@@ -5,6 +5,7 @@ import * as Linking from 'expo-linking';
 import { Mail, ArrowLeft } from 'lucide-react-native';
 
 import { Text, Screen, Card } from '@/components/Themed';
+import { isValidEmail, normalizeAuthEmail } from '@/services/authFlowUtils';
 import { supabase } from '@/services/supabase';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
@@ -26,9 +27,14 @@ export default function ForgotPasswordScreen() {
     };
 
     const onSendResetEmail = async () => {
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedEmail = normalizeAuthEmail(email);
         if (!normalizedEmail) {
             showMessage('Error', 'Please enter your email.', 'error');
+            return;
+        }
+
+        if (!isValidEmail(normalizedEmail)) {
+            showMessage('Error', 'Please enter a valid email address.', 'error');
             return;
         }
 

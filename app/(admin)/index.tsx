@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { AlertCircle, ArrowDownToLine, BellRing, ChevronDown, ChevronRight, ChevronUp, Crown, RefreshCcw, Search, TrendingUp, UserMinus, Users, Wallet } from 'lucide-react-native';
 import { Card, Screen } from '@/components/Themed';
 import { supabase } from '@/services/supabase';
-import { getPlanLabel, normalizePlanTier, PlanTier } from '@/services/subscriptionPlan';
+import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
 
 interface DashboardStats {
   total_users: number;
@@ -48,7 +48,6 @@ export default function AdminDashboardIndex() {
   const [planUsers, setPlanUsers] = useState<AdminPlanUser[]>([]);
   const [planSearch, setPlanSearch] = useState('');
   const [planUsersExpanded, setPlanUsersExpanded] = useState(false);
-  const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -106,46 +105,6 @@ export default function AdminDashboardIndex() {
       )
       .slice(0, 12);
   }, [planSearch, planUsers]);
-
-  const updatePlanTier = async (userId: string, nextPlan: PlanTier) => {
-    setSavingUserId(userId);
-    setError('');
-    try {
-      const { error } = await supabase.rpc('admin_set_profile_plan_tier', {
-        p_user_id: userId,
-        p_plan_tier: nextPlan,
-      });
-
-      if (error) throw error;
-
-      setPlanUsers((current) =>
-        current.map((item) => (item.id === userId ? { ...item, plan_tier: nextPlan } : item))
-      );
-      setStats((current) => {
-        if (!current) return current;
-        const currentPlan = normalizePlanTier(planUsers.find((item) => item.id === userId)?.plan_tier);
-        if (currentPlan === nextPlan) return current;
-
-        if (nextPlan === 'premium') {
-          return {
-            ...current,
-            premium_users: current.premium_users + 1,
-            free_users: Math.max(current.free_users - 1, 0),
-          };
-        }
-
-        return {
-          ...current,
-          premium_users: Math.max(current.premium_users - 1, 0),
-          free_users: current.free_users + 1,
-        };
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to update plan');
-    } finally {
-      setSavingUserId(null);
-    }
-  };
 
   if (loading && !refreshing) {
     return (
@@ -266,8 +225,8 @@ export default function AdminDashboardIndex() {
         <Card style={styles.managedPlanCard}>
           <View style={styles.managedPlanHeader}>
             <View style={styles.managedPlanCopy}>
-              <Text style={styles.managedPlanTitle}>Membership control inside the dashboard</Text>
-              <Text style={styles.managedPlanText}>Search a user and switch their tier without opening a separate screen.</Text>
+              <Text style={styles.managedPlanTitle}>Membership overview inside the dashboard</Text>
+              <Text style={styles.managedPlanText}>Search a user and review their current tier. Premium activation is handled by verified billing and referral flows only.</Text>
             </View>
             <View style={styles.managedPlanSummary}>
               <Text style={styles.managedPlanSummaryValue}>{stats?.premium_users || 0}</Text>
@@ -309,7 +268,6 @@ export default function AdminDashboardIndex() {
               <View style={styles.planUsersList}>
                 {filteredPlanUsers.map((user) => {
                   const normalizedPlan = normalizePlanTier(user.plan_tier);
-                  const isSaving = savingUserId === user.id;
                   const displayName = user.full_name?.trim() || user.email || 'Unknown user';
 
                   return (
@@ -330,24 +288,7 @@ export default function AdminDashboardIndex() {
                         <Text style={[styles.inlinePlanBadge, normalizedPlan === 'premium' ? styles.inlinePlanBadgePremium : styles.inlinePlanBadgeFree]}>
                           {getPlanLabel(normalizedPlan)}
                         </Text>
-                        <View style={styles.inlinePlanActions}>
-                          <TouchableOpacity
-                            style={[styles.inlinePlanButton, normalizedPlan === 'free' ? styles.inlinePlanButtonActive : null]}
-                            disabled={isSaving || normalizedPlan === 'free'}
-                            onPress={() => void updatePlanTier(user.id, 'free')}
-                          >
-                            <Text style={[styles.inlinePlanButtonText, normalizedPlan === 'free' ? styles.inlinePlanButtonTextActive : null]}>Free</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.inlinePlanButton, normalizedPlan === 'premium' ? styles.inlinePlanButtonPremiumActive : null]}
-                            disabled={isSaving || normalizedPlan === 'premium'}
-                            onPress={() => void updatePlanTier(user.id, 'premium')}
-                          >
-                            <Text style={[styles.inlinePlanButtonText, normalizedPlan === 'premium' ? styles.inlinePlanButtonTextPremiumActive : null]}>
-                              {isSaving ? 'Saving...' : 'Premium'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
+                        <Text style={styles.planUserMeta}>Read only</Text>
                       </View>
                     </View>
                   );
@@ -850,6 +791,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 8,
     backgroundColor: 'transparent',
+  },
+  planUserMeta: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
   },
   inlinePlanBadge: {
     fontSize: 11,

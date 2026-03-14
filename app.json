@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Body Balance iOS",
-    "slug": "buddy-balance-ios",
+    "name": "Buddy Balance",
+    "slug": "buddy-balance",
     "version": "1.0.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "buddybalance-ios",
+    "scheme": "buddybalance",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash-icon.png",
@@ -31,7 +31,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Buddy Balance to access your photos so you can choose a profile picture or attach an image to a record."
+          "photosPermission": "Allow Buddy Balance to access your photos so you can choose a profile picture or attach an image to a record.",
+          "microphonePermission": false
         }
       ],
       [

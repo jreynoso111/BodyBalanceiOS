@@ -76,6 +76,11 @@ function isAllowedOrigin(origin: string | null) {
   return getAllowedOrigins().has(origin);
 }
 
+function isLocalOrigin(origin: string | null) {
+  if (!origin) return false;
+  return LOCALHOST_ORIGINS.has(origin);
+}
+
 function getClientIp(req: Request) {
   const forwardedFor = req.headers.get('x-forwarded-for') || req.headers.get('X-Forwarded-For') || '';
   const forwarded = forwardedFor.split(',')[0]?.trim();
@@ -134,8 +139,14 @@ async function enforceRateLimit(clientIp: string, email: string) {
   }
 }
 
-async function verifyTurnstile(token: string, clientIp: string) {
-  if (!TURNSTILE_SECRET_KEY) return;
+async function verifyTurnstile(token: string, clientIp: string, origin: string | null) {
+  if (!TURNSTILE_SECRET_KEY) {
+    if (isLocalOrigin(origin)) {
+      return;
+    }
+
+    throw new Error('CAPTCHA protection is misconfigured on the server. Contact support later.');
+  }
 
   if (!token) {
     throw new Error('CAPTCHA verification is required.');
@@ -220,7 +231,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Message is too long.' }, 400, origin);
     }
 
-    await verifyTurnstile(turnstileToken, clientIp);
+    await verifyTurnstile(turnstileToken, clientIp, origin);
     await enforceRateLimit(clientIp, email);
 
     const supportSubject = subject || `Website contact from ${name}`;

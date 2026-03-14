@@ -1,6 +1,6 @@
-# Body Balance iOS
+# Buddy Balance App
 
-Proyecto separado para la app iOS.
+Proyecto separado para la app de Buddy Balance.
 
 ## Desarrollo
 
@@ -11,5 +11,5 @@ npm run ios
 
 ## Notas
 
-- Esta carpeta se creó a partir de la app original.
+- Esta carpeta contiene la app móvil.
 - El frontend web quedó en `/Users/jreynoso/I Got You`.

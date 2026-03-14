@@ -1,15 +1,5 @@
 import Constants from 'expo-constants';
-import {
-  type ProductOrSubscription,
-  type Purchase,
-  endConnection,
-  fetchProducts,
-  finishTransaction,
-  getAvailablePurchases,
-  initConnection,
-  requestPurchase,
-  restorePurchases,
-} from 'expo-iap';
+import type { ProductOrSubscription, Purchase } from 'expo-iap';
 import { Platform } from 'react-native';
 
 import { supabase } from '@/services/supabase';
@@ -55,6 +45,19 @@ const ANDROID_PACKAGE_NAME =
 let billingConfiguredUser: BillingUser = {};
 let billingConnectionReady = false;
 let billingConnectionPromise: Promise<boolean> | null = null;
+let expoIapModulePromise: Promise<typeof import('expo-iap')> | null = null;
+
+async function getExpoIapModule() {
+  if (Platform.OS !== 'android') {
+    throw new Error('Google Play billing is only available on Android.');
+  }
+
+  if (!expoIapModulePromise) {
+    expoIapModulePromise = import('expo-iap');
+  }
+
+  return expoIapModulePromise;
+}
 
 function hasAndroidBillingConfig() {
   return Boolean(ANDROID_PREMIUM_PRODUCT_ID && ANDROID_PACKAGE_NAME);
@@ -70,7 +73,8 @@ async function ensureBillingConnection() {
   }
 
   if (!billingConnectionPromise) {
-    billingConnectionPromise = initConnection()
+    billingConnectionPromise = getExpoIapModule()
+      .then((module) => module.initConnection())
       .then((connected) => {
         billingConnectionReady = Boolean(connected);
         return billingConnectionReady;
@@ -118,6 +122,7 @@ function isPurchaseCancelled(error: unknown) {
 
 async function fetchPremiumProduct() {
   await ensureBillingConnection();
+  const { fetchProducts } = await getExpoIapModule();
 
   const products = (await fetchProducts({
     skus: [ANDROID_PREMIUM_PRODUCT_ID],
@@ -272,6 +277,7 @@ export async function configureBillingForUser(user: BillingUser) {
 
   if (!user.userId) {
     if (billingConnectionReady) {
+      const { endConnection } = await getExpoIapModule().catch(() => ({ endConnection: async () => null }));
       await endConnection().catch(() => null);
       billingConnectionReady = false;
     }
@@ -356,6 +362,7 @@ export async function purchasePremiumPackage() {
   }
 
   try {
+    const { requestPurchase, finishTransaction } = await getExpoIapModule();
     const purchaseResult = await requestPurchase({
       type: 'in-app',
       request: {
@@ -413,6 +420,7 @@ export async function restorePremiumAccess() {
   }
 
   try {
+    const { finishTransaction, getAvailablePurchases, restorePurchases } = await getExpoIapModule();
     await ensureBillingConnection();
     await restorePurchases();
 
@@ -462,6 +470,7 @@ export async function getLocalBillingPlanTier() {
     return 'free' as PlanTier;
   }
 
+  const { getAvailablePurchases } = await getExpoIapModule();
   await ensureBillingConnection();
   const purchases = await getAvailablePurchases({
     alsoPublishToEventListenerIOS: false,

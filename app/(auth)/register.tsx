@@ -7,7 +7,12 @@ import { Card, Screen, Text } from '@/components/Themed';
 import { BrandLogo } from '@/components/BrandLogo';
 import { GoogleLogo } from '@/components/GoogleLogo';
 import { waitForAuthSession } from '@/services/authSession';
-import { getPasswordPolicyMessage, isStrongPassword } from '@/services/passwordPolicy';
+import {
+    mapRegistrationAuthError,
+    normalizeAuthEmail,
+    validateRegistrationFields,
+    validateVerificationCodeInput,
+} from '@/services/authFlowUtils';
 import { supabase } from '@/services/supabase';
 import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWithGoogle } from '@/services/oauth';
 import { useAuthStore } from '@/store/authStore';
@@ -35,32 +40,12 @@ export default function RegisterScreen() {
     const googleUnavailableReason = getGoogleOAuthUnavailableReason();
     const nextRoute = Platform.OS === 'web' ? '/settings' : '/(tabs)';
 
-    const normalizeEmail = (value: string) => value.trim().toLowerCase();
-
-    const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
-
     const showMessage = (title: string, message: string, tone: FeedbackTone) => {
         setFeedback({ tone, text: message });
 
         if (Platform.OS !== 'web') {
             Alert.alert(title, message);
         }
-    };
-
-    const mapAuthError = (message: string) => {
-        const normalized = message.toLowerCase();
-
-        if (normalized.includes('already registered')) {
-            return 'This email is already registered. Try signing in or reset your password.';
-        }
-        if (normalized.includes('password should be at least')) {
-            return getPasswordPolicyMessage();
-        }
-        if (normalized.includes('unable to validate email address')) {
-            return 'Please enter a valid email address.';
-        }
-
-        return message;
     };
 
     const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 20000): Promise<T> => {
@@ -78,28 +63,19 @@ export default function RegisterScreen() {
         }
     };
 
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = normalizeAuthEmail(email);
     const busy = loading || verifyingCode || googleLoading;
 
     const validateAccountFields = () => {
-        if (!fullName.trim()) {
-            showMessage('Error', 'Please enter your full name.', 'error');
-            return false;
-        }
-        if (!normalizedEmail) {
-            showMessage('Error', 'Please enter your email address.', 'error');
-            return false;
-        }
-        if (!isValidEmail(normalizedEmail)) {
-            showMessage('Error', 'Please enter a valid email address.', 'error');
-            return false;
-        }
-        if (!isStrongPassword(password)) {
-            showMessage('Error', getPasswordPolicyMessage(), 'error');
-            return false;
-        }
-        if (password !== confirmPassword) {
-            showMessage('Error', 'Passwords do not match.', 'error');
+        const validationError = validateRegistrationFields({
+            fullName,
+            email: normalizedEmail,
+            password,
+            confirmPassword,
+        });
+
+        if (validationError) {
+            showMessage('Error', validationError, 'error');
             return false;
         }
 
@@ -130,7 +106,7 @@ export default function RegisterScreen() {
             );
 
             if (error) {
-                showMessage('Verification failed', mapAuthError(error.message), 'error');
+                showMessage('Verification failed', mapRegistrationAuthError(error.message), 'error');
                 return;
             }
 
@@ -151,8 +127,9 @@ export default function RegisterScreen() {
         if (busy) return;
 
         const token = verificationCode.trim().replace(/\s+/g, '');
-        if (token.length < 6) {
-            showMessage('Error', 'Please enter the 6-digit verification code.', 'error');
+        const verificationErrorMessage = validateVerificationCodeInput(token);
+        if (verificationErrorMessage) {
+            showMessage('Error', verificationErrorMessage, 'error');
             return;
         }
 
@@ -184,7 +161,7 @@ export default function RegisterScreen() {
             if (!verificationSucceeded) {
                 showMessage(
                     'Invalid code',
-                    mapAuthError(verificationError?.message || 'The verification code is invalid or expired.'),
+                    mapRegistrationAuthError(verificationError?.message || 'The verification code is invalid or expired.'),
                     'error'
                 );
                 return;
@@ -200,7 +177,7 @@ export default function RegisterScreen() {
             );
 
             if (passwordError) {
-                showMessage('Account setup failed', mapAuthError(passwordError.message), 'error');
+                showMessage('Account setup failed', mapRegistrationAuthError(passwordError.message), 'error');
                 return;
             }
 

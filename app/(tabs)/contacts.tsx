@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, View as RNView, TextInput, useWindowDimensions, Modal, ScrollView, RefreshControl } from 'react-native';
+import { Alert, StyleSheet, FlatList, TouchableOpacity, View as RNView, TextInput, useWindowDimensions, Modal, ScrollView, RefreshControl, Platform } from 'react-native';
 import { Text, View, Screen, Card } from '@/components/Themed';
 import { AppLegalFooter } from '@/components/AppLegalFooter';
 import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
-import { UserPlus, Search, ChevronDown, ChevronUp, X, Link2, Plus } from 'lucide-react-native';
+import { UserPlus, Search, ChevronDown, ChevronUp, X, Link2, Plus, Trash2 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrencySymbol } from '@/constants/Currencies';
@@ -98,6 +98,7 @@ export default function ContactsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedContactId, setExpandedContactId] = useState<string | null>(null);
   const [selectedHistoryContact, setSelectedHistoryContact] = useState<{ name: string; events: ContactHistoryEvent[] } | null>(null);
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -261,6 +262,91 @@ export default function ContactsScreen() {
     setSelectedHistoryContact(null);
   };
 
+  const confirmDeleteContact = useCallback(async (contact: ContactItem) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
+    try {
+      setDeletingContactId(contact.id);
+
+      const { data: hardDeletedRows, error: hardDeleteError } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', contact.id)
+        .eq('user_id', user.id)
+        .select('id');
+
+      if (!hardDeleteError && hardDeletedRows && hardDeletedRows.length > 0) {
+        setExpandedContactId((current) => (current === contact.id ? null : current));
+        await fetchContacts();
+        Alert.alert('Success', 'Contact deleted');
+        return;
+      }
+
+      if (hardDeleteError && hardDeleteError.code !== '23503') {
+        Alert.alert('Error', hardDeleteError.message);
+        return;
+      }
+
+      const { data: softDeletedRows, error: softDeleteError } = await supabase
+        .from('contacts')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', contact.id)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .select('id');
+
+      if (softDeleteError) {
+        Alert.alert('Error', softDeleteError.message);
+        return;
+      }
+
+      if (!softDeletedRows || softDeletedRows.length === 0) {
+        Alert.alert('Error', 'Contact could not be deleted');
+        return;
+      }
+
+      setExpandedContactId((current) => (current === contact.id ? null : current));
+      await fetchContacts();
+      Alert.alert('Success', 'Contact deleted');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Unexpected error deleting contact');
+    } finally {
+      setDeletingContactId(null);
+    }
+  }, [fetchContacts, user?.id]);
+
+  const handleDeleteContactPress = useCallback((contact: ContactItem) => {
+    const title = 'Delete Contact';
+    const message = 'Are you sure you want to delete this contact? This will not affect existing lend/borrow records.';
+
+    if (Platform.OS === 'web') {
+      const browserConfirm = typeof globalThis.confirm === 'function' ? globalThis.confirm : null;
+      const accepted = browserConfirm ? browserConfirm(`${title}\n\n${message}`) : true;
+      if (accepted) {
+        void confirmDeleteContact(contact);
+      }
+      return;
+    }
+
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void confirmDeleteContact(contact);
+          },
+        },
+      ]
+    );
+  }, [confirmDeleteContact]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -380,6 +466,16 @@ export default function ContactsScreen() {
                         onPress={() => router.push({ pathname: '/new-contact', params: { id: item.id } })}
                       >
                         <Text style={styles.inlineLinkText}>Edit contact</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.inlineLinkButton, styles.inlineDeleteButton]}
+                        disabled={deletingContactId === item.id}
+                        onPress={() => handleDeleteContactPress(item)}
+                      >
+                        <Trash2 size={14} color="#DC2626" />
+                        <Text style={styles.inlineDeleteText}>
+                          {deletingContactId === item.id ? 'Deleting...' : 'Delete'}
+                        </Text>
                       </TouchableOpacity>
                     </RNView>
                   </RNView>
@@ -913,10 +1009,16 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
   inlineLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 999,
     backgroundColor: '#EEF2FF',
+  },
+  inlineDeleteButton: {
+    backgroundColor: '#FEF2F2',
   },
   inlineActionsRow: {
     flexDirection: 'row',
@@ -942,6 +1044,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#6366F1',
+  },
+  inlineDeleteText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#DC2626',
   },
   detailList: {
     borderWidth: 1,

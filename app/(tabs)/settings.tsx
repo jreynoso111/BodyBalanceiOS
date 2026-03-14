@@ -4,7 +4,7 @@ import { Link, Redirect } from 'expo-router';
 import { Text, View, Screen, Card } from '@/components/Themed';
 import { clearPersistedAuthState, supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
-import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles } from 'lucide-react-native';
+import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles, Trash2 } from 'lucide-react-native';
 import { exportLoansToCSV } from '@/services/exportService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { DEFAULT_USER_PREFERENCES, getOrCreateUserPreferences } from '@/services/userPreferences';
@@ -149,6 +149,7 @@ export default function SettingsScreen() {
         { icon: Bell, label: 'Notifications', sub: prefs.push_enabled ? 'Enabled' : 'Disabled', onPress: () => router.push('/notifications') },
         { icon: Shield, label: 'Security', sub: prefs.biometric_enabled ? 'Biometric On' : 'Biometric Off', onPress: () => router.push('/security') },
         { icon: CircleHelp, label: 'Help & Support', sub: 'FAQ & guidance', onPress: () => router.push('/help-support') },
+        { icon: Trash2, label: 'Delete Account', sub: 'Permanent account removal', onPress: () => router.push('/delete-account') },
     ];
 
     if (planTier === 'premium') {
@@ -241,6 +242,9 @@ export default function SettingsScreen() {
                         <TouchableOpacity style={styles.webSecondaryButton} onPress={handleSignOut} disabled={signingOut}>
                             <Text style={styles.webSecondaryButtonText}>{signingOut ? 'Signing out...' : 'Sign out'}</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity style={styles.webDangerButton} onPress={() => router.push('/delete-account')}>
+                            <Text style={styles.webDangerButtonText}>Delete account</Text>
+                        </TouchableOpacity>
                     </Card>
                 </View>
             </WebAccountLayout>
@@ -301,6 +305,11 @@ export default function SettingsScreen() {
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} disabled={signingOut}>
                     <LogOut size={20} color="#EF4444" />
                     <Text style={styles.signOutText}>{signingOut ? 'Signing Out...' : 'Sign Out'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.deleteAccountButton} onPress={() => router.push('/delete-account')}>
+                    <Trash2 size={20} color="#B91C1C" />
+                    <Text style={styles.deleteAccountText}>Delete Account</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.version}>Buddy Balance v1.0.0</Text>
@@ -429,6 +438,23 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
     },
+    deleteAccountButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+        marginTop: 12,
+        backgroundColor: '#FEF2F2',
+        borderRadius: 16,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    deleteAccountText: {
+        color: '#B91C1C',
+        fontSize: 16,
+        fontWeight: '700',
+    },
     version: {
         textAlign: 'center',
         color: '#94A3B8',
@@ -549,5 +575,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '800',
         color: '#1E293B',
+    },
+    webDangerButton: {
+        minHeight: 48,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+        backgroundColor: '#FEF2F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+        marginTop: 10,
+    },
+    webDangerButtonText: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#B91C1C',
     },
 });

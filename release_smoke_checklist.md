@@ -2,6 +2,17 @@
 
 Use this checklist before promoting a build to production or store review.
 
+## Automated gate
+
+- Run `npm run verify:release`.
+- Confirm the release test run includes:
+  - billing readiness
+  - auth registration / recovery validation helpers
+  - friend merge / cancel decision logic
+  - account deletion client flow
+  - CSV export sanitization
+  - notification copy helpers
+
 ## Authentication
 
 - Register with email/password.
@@ -46,6 +57,5 @@ Use this checklist before promoting a build to production or store review.
 
 ## Build / Release Gate
 
-- Run `npm run verify:release`.
 - Run one production-like Android build.
 - If shipping iOS, run one physical-device iPhone pass for auth recovery, notifications, and support flows.

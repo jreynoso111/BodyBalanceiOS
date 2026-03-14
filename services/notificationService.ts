@@ -55,6 +55,9 @@ export async function showSharedUpdateNotification(options: {
     if (options.type === 'friend_request') {
         title = 'New friend request';
         body = options.message?.trim() || `${sender} wants to connect with you.`;
+    } else if (options.type === 'friend_merge_choice') {
+        title = 'Choose shared history';
+        body = options.message?.trim() || 'You both already tracked separate records. Choose which history to keep.';
     } else if (options.type === 'loan_notice') {
         title = 'Shared record added';
         body = options.message?.trim() || `${sender} added a shared record with you.`;

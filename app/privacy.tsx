@@ -39,7 +39,7 @@ const SECTIONS = [
   {
     title: 'Retention and deletion',
     body:
-      'We retain data for as long as it is needed to operate the service, satisfy support or audit needs, and maintain shared record history. If you need your account reviewed for deletion, use the in-app support form so the request can be verified and processed.',
+      'We retain data for as long as it is needed to operate the service, satisfy support or audit needs, and maintain shared record history. You can request permanent account deletion directly from Settings inside the app. Some shared references in other accounts may remain as detached history where required for record integrity.',
   },
   {
     title: 'Policy changes',

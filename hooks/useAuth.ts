@@ -18,6 +18,7 @@ const NON_RECOVERABLE_PATH_PREFIXES = [
     '/payment',
     '/register-payment',
     '/profile',
+    '/delete-account',
 ];
 const PUBLIC_PATH_PREFIXES = [
     '/contact',

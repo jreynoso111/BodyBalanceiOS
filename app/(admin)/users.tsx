@@ -17,7 +17,6 @@ import { Card, Screen } from '@/components/Themed';
 import { supabase } from '@/services/supabase';
 import {
     AlertCircle,
-    BadgeCheck,
     Crown,
     History,
     Mail,
@@ -29,7 +28,7 @@ import {
     User as UserIcon,
     X,
 } from 'lucide-react-native';
-import { getPlanLabel, normalizePlanTier, PlanTier } from '@/services/subscriptionPlan';
+import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
 
 interface AdminUserProfile {
     id: string;
@@ -176,27 +175,6 @@ export default function AdminUsersList() {
         }
 
         return data;
-    };
-
-    const updatePlanTier = async (userId: string, nextPlan: PlanTier) => {
-        setSavingUserId(userId);
-        try {
-            const { error } = await supabase.rpc('admin_set_profile_plan_tier', {
-                p_user_id: userId,
-                p_plan_tier: nextPlan,
-            });
-
-            if (error) throw error;
-
-            setUsers((current) =>
-                current.map((item) => (item.id === userId ? { ...item, plan_tier: nextPlan } : item))
-            );
-            setSelectedUser((current) => (current?.id === userId ? { ...current, plan_tier: nextPlan } : current));
-        } catch (err: any) {
-            setError(err.message || 'Failed to update plan');
-        } finally {
-            setSavingUserId(null);
-        }
     };
 
     const openManageModal = (user: AdminUserProfile) => {
@@ -380,7 +358,6 @@ export default function AdminUsersList() {
     }
 
     const selectedPlan = normalizePlanTier(selectedUser?.plan_tier);
-    const nextPlan = selectedPlan === 'premium' ? 'free' : 'premium';
 
     return (
         <Screen style={styles.container}>
@@ -443,16 +420,12 @@ export default function AdminUsersList() {
                                     </View>
                                 </View>
 
-                                <TouchableOpacity
-                                    style={styles.managePrimaryButton}
-                                    onPress={() => void updatePlanTier(selectedUser.id, nextPlan)}
-                                    disabled={savingUserId === selectedUser.id}
-                                >
-                                    <BadgeCheck size={16} color="#FFFFFF" />
-                                    <Text style={styles.managePrimaryButtonText}>
-                                        Change tier to {getPlanLabel(nextPlan)}
+                                <View style={styles.membershipNotice}>
+                                    <Text style={styles.membershipNoticeTitle}>Membership is read-only here</Text>
+                                    <Text style={styles.membershipNoticeText}>
+                                        Premium can only be activated through verified billing or referral rewards. Admins can review the current tier, but cannot change it from this panel.
                                     </Text>
-                                </TouchableOpacity>
+                                </View>
 
                                 <TouchableOpacity
                                     style={styles.manageSecondaryButton}
@@ -821,20 +794,24 @@ const styles = StyleSheet.create({
     summaryChipTextPremium: {
         color: '#047857',
     },
-    managePrimaryButton: {
-        minHeight: 48,
+    membershipNotice: {
         borderRadius: 16,
-        backgroundColor: '#6366F1',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: 8,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#F8FAFC',
+        padding: 14,
         marginBottom: 12,
     },
-    managePrimaryButtonText: {
-        fontSize: 15,
+    membershipNoticeTitle: {
+        fontSize: 14,
         fontWeight: '800',
-        color: '#FFFFFF',
+        color: '#0F172A',
+        marginBottom: 6,
+    },
+    membershipNoticeText: {
+        fontSize: 13,
+        lineHeight: 20,
+        color: '#475569',
     },
     manageSecondaryButton: {
         minHeight: 46,
