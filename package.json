@@ -15,9 +15,12 @@
     "typecheck": "tsc --noEmit",
     "doctor": "npx expo-doctor",
     "verify:release": "npm run test:release && npm run typecheck && npm run doctor",
+    "verify:supabase-config": "bash ./scripts/verify-supabase-config.sh",
     "deploy:admin-user-management": "supabase functions deploy admin-user-management --no-verify-jwt",
     "deploy:google-play-sync": "supabase functions deploy google-play-sync --no-verify-jwt",
-    "deploy:account-management": "supabase functions deploy account-management --no-verify-jwt"
+    "deploy:account-management": "supabase functions deploy account-management --no-verify-jwt",
+    "deploy:public-auth": "supabase functions deploy public-auth --no-verify-jwt",
+    "deploy:public-contact": "supabase functions deploy public-contact --no-verify-jwt"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

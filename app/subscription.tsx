@@ -254,7 +254,7 @@ export default function SubscriptionScreen() {
           <Text style={styles.heroText}>
             Buddy Balance Pro removes the friend and active record limits. {premiumPackageLabel}.
           </Text>
-          {planTier !== 'premium' ? (
+          {planTier !== 'premium' && Platform.OS === 'android' ? (
             <RNView style={styles.ctaGroup}>
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -283,6 +283,10 @@ export default function SubscriptionScreen() {
               ) : (
                 <Text style={styles.ctaHint}>{billingStatusReason || unavailableReason}</Text>
               )}
+            </RNView>
+          ) : planTier !== 'premium' ? (
+            <RNView style={styles.ctaGroup}>
+              <Text style={styles.ctaHint}>{unavailableReason}</Text>
             </RNView>
           ) : null}
         </Card>
@@ -319,9 +323,11 @@ export default function SubscriptionScreen() {
               ? 'Premium purchases and restores now run through Google Play on Android. The server validates the purchase token before the app marks this account as Premium.'
               : billingStatusReason || unavailableReason}
           </Text>
-          <Text style={styles.stateFootnote}>
-            Current status: the app expects the Android product id `EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID` and validates completed purchases through the `google-play-sync` Supabase function.
-          </Text>
+          {Platform.OS === 'android' ? (
+            <Text style={styles.stateFootnote}>
+              Current status: the app expects the Android product id `EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID` and validates completed purchases through the `google-play-sync` Supabase function.
+            </Text>
+          ) : null}
           {referralSummary ? (
             <Text style={styles.androidHint}>
               {referralSummary.premiumReferralExpiresAt

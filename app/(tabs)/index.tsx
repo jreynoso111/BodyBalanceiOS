@@ -11,6 +11,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { getCurrencySymbol } from '@/constants/Currencies';
 import { useGreetingStore } from '@/store/greetingStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isTransientNetworkError, retryAsync } from '@/services/networkRetry';
 
 type LoanRecord = {
   id: string;
@@ -146,24 +147,40 @@ export default function DashboardScreen() {
         setAccountName(profileNameFromMetadata);
       }
 
-      const [profileResult, loansResult, paymentsResult, requestsResult] = await Promise.all([
-        supabase.from('profiles').select('full_name, friend_code').eq('id', user.id).maybeSingle(),
-        supabase
-          .from('loans')
-          .select('id, amount, type, status, category, created_at, due_date, item_name, currency, contacts(name)')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('payments')
-          .select('amount, loan_id, payment_date, payment_method')
-          .eq('user_id', user.id),
-        supabase
-          .from('p2p_requests')
-          .select('*', { count: 'exact', head: true })
-          .eq('to_user_id', user.id)
-          .eq('status', 'pending'),
-      ]);
+      const [profileResult, loansResult, paymentsResult, requestsResult] = await retryAsync(
+        async () => {
+          const results = await Promise.all([
+            supabase.from('profiles').select('full_name, friend_code').eq('id', user.id).maybeSingle(),
+            supabase
+              .from('loans')
+              .select('id, amount, type, status, category, created_at, due_date, item_name, currency, contacts(name)')
+              .eq('user_id', user.id)
+              .is('deleted_at', null)
+              .order('created_at', { ascending: false }),
+            supabase
+              .from('payments')
+              .select('amount, loan_id, payment_date, payment_method')
+              .eq('user_id', user.id),
+            supabase
+              .from('p2p_requests')
+              .select('*', { count: 'exact', head: true })
+              .eq('to_user_id', user.id)
+              .eq('status', 'pending'),
+          ]);
+
+          const firstError = results.find((result) => Boolean((result as any)?.error)) as { error?: { message?: string } } | undefined;
+          if (firstError?.error?.message) {
+            throw new Error(firstError.error.message);
+          }
+
+          return results;
+        },
+        {
+          retries: 2,
+          delayMs: 900,
+          shouldRetry: isTransientNetworkError,
+        }
+      );
 
       if (profileResult.error) {
         console.error('dashboard profile load failed:', profileResult.error.message);

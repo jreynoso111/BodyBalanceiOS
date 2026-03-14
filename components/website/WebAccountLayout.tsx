@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { AppLegalFooter } from '@/components/AppLegalFooter';
 import { Text } from '@/components/Themed';
-import { clearPersistedAuthState, supabase } from '@/services/supabase';
+import { signOutLocalSession } from '@/services/supabase';
 import { getDeviceLanguage } from '@/constants/i18n';
 import { getPlanLabel } from '@/services/subscriptionPlan';
 import { useAuthStore } from '@/store/authStore';
@@ -51,8 +51,7 @@ export function WebAccountLayout({
   const hasAdminAccess = normalizedRole === 'admin' || normalizedRole === 'administrator';
 
   const signOut = async () => {
-    await supabase.auth.signOut().catch(() => null);
-    await clearPersistedAuthState().catch(() => null);
+    await signOutLocalSession();
     setSession(null);
     setUser(null);
     setRole(null);

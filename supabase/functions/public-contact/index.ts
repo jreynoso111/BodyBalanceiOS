@@ -15,9 +15,21 @@ const PUBLIC_CONTACT_ALLOWED_ORIGINS = (Deno.env.get('PUBLIC_CONTACT_ALLOWED_ORI
   .map((value) => value.trim())
   .filter(Boolean);
 const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY') || '';
-const PUBLIC_CONTACT_WINDOW_MINUTES = Math.max(1, Number(Deno.env.get('PUBLIC_CONTACT_WINDOW_MINUTES') || '10'));
-const PUBLIC_CONTACT_MAX_IP_ATTEMPTS = Math.max(1, Number(Deno.env.get('PUBLIC_CONTACT_MAX_IP_ATTEMPTS') || '5'));
-const PUBLIC_CONTACT_MAX_EMAIL_ATTEMPTS = Math.max(1, Number(Deno.env.get('PUBLIC_CONTACT_MAX_EMAIL_ATTEMPTS') || '3'));
+const PUBLIC_CONTACT_WINDOW_MS = resolveWindowMs({
+  minutesEnvName: 'PUBLIC_CONTACT_WINDOW_MINUTES',
+  legacyMsEnvName: 'PUBLIC_CONTACT_RATE_LIMIT_WINDOW_MS',
+  defaultMinutes: 10,
+});
+const PUBLIC_CONTACT_MAX_IP_ATTEMPTS = resolveAttemptLimit({
+  envName: 'PUBLIC_CONTACT_MAX_IP_ATTEMPTS',
+  legacyEnvName: 'PUBLIC_CONTACT_RATE_LIMIT_MAX',
+  defaultValue: 5,
+});
+const PUBLIC_CONTACT_MAX_EMAIL_ATTEMPTS = resolveAttemptLimit({
+  envName: 'PUBLIC_CONTACT_MAX_EMAIL_ATTEMPTS',
+  legacyEnvName: 'PUBLIC_CONTACT_RATE_LIMIT_MAX',
+  defaultValue: 3,
+});
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -30,6 +42,55 @@ const LOCALHOST_ORIGINS = new Set([
   'http://127.0.0.1:8081',
   'http://127.0.0.1:19006',
 ]);
+
+function getPositiveNumberFromEnv(envName: string) {
+  const value = Number(Deno.env.get(envName) || '');
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function resolveWindowMs({
+  minutesEnvName,
+  legacyMsEnvName,
+  defaultMinutes,
+}: {
+  minutesEnvName: string;
+  legacyMsEnvName: string;
+  defaultMinutes: number;
+}) {
+  const explicitMinutes = getPositiveNumberFromEnv(minutesEnvName);
+  if (explicitMinutes) {
+    return explicitMinutes * 60_000;
+  }
+
+  const legacyWindowMs = getPositiveNumberFromEnv(legacyMsEnvName);
+  if (legacyWindowMs) {
+    return Math.max(60_000, legacyWindowMs);
+  }
+
+  return defaultMinutes * 60_000;
+}
+
+function resolveAttemptLimit({
+  envName,
+  legacyEnvName,
+  defaultValue,
+}: {
+  envName: string;
+  legacyEnvName: string;
+  defaultValue: number;
+}) {
+  const explicitValue = getPositiveNumberFromEnv(envName);
+  if (explicitValue) {
+    return Math.max(1, Math.floor(explicitValue));
+  }
+
+  const legacyValue = getPositiveNumberFromEnv(legacyEnvName);
+  if (legacyValue) {
+    return Math.max(1, Math.floor(legacyValue));
+  }
+
+  return defaultValue;
+}
 
 function getAllowedOrigins() {
   return new Set([...LOCALHOST_ORIGINS, ...PUBLIC_CONTACT_ALLOWED_ORIGINS]);
@@ -101,11 +162,8 @@ async function sha256(value: string) {
 }
 
 function getBucketStart(now = new Date()) {
-  const bucket = new Date(now);
-  const minutes = bucket.getUTCMinutes();
-  const roundedMinutes = Math.floor(minutes / PUBLIC_CONTACT_WINDOW_MINUTES) * PUBLIC_CONTACT_WINDOW_MINUTES;
-  bucket.setUTCMinutes(roundedMinutes, 0, 0);
-  return bucket.toISOString();
+  const bucketMs = Math.floor(now.getTime() / PUBLIC_CONTACT_WINDOW_MS) * PUBLIC_CONTACT_WINDOW_MS;
+  return new Date(bucketMs).toISOString();
 }
 
 async function bumpRateLimit(rateKey: string) {

@@ -1,64 +1,58 @@
 import { create } from 'zustand';
-
-const COMMON_GREETINGS = ['Hello', 'Hi', 'Howdy', 'Hola'];
-const OTHER_GREETINGS = [
-  'Bonjour', 'Ciao', 'Hallo', 'Ola', 'Aloha', 'Namaste', 'Salaam',
-  'Marhaba', 'Shalom', 'Hej', 'Hei', 'Salut', 'Merhaba', 'Szia',
-  'Ahoj', 'Xin chao', 'Sawasdee', 'Mingalaba', 'Sawubona', 'Jambo',
-  'Habari', 'Dia dhuit', 'Yassas', 'Privet', 'Zdravo', 'Pozdrav',
-  'Servus', 'Dzień dobry', 'Buna', 'Labas', 'Sveiki', 'Tere',
-  'Moien', 'God dag', 'Godan daginn', 'Hyvää päivää', 'Geia sou',
-  'Selam', 'As-salaam', 'Kia ora', 'Talofa', 'Bula', 'Konnichiwa',
-  'Konbanwa', 'Annyeonghaseyo', 'Ni hao', 'Nin hao', 'Zdravstvuyte',
-  'Dobry den', 'Dobrý deň', 'Dobar dan', 'Bok', 'Halo', 'Kamusta',
-  'Vanakkam', 'Sat sri akaal', 'Adaab', 'Sannu', 'Molo', 'Avuxeni',
-  'Ndewo', 'Assalaamu alaikum', 'Përshëndetje', 'Mirëdita', 'Tungjatjeta', 'Pace'
-];
-
-const generateGreetings = (): readonly string[] => {
-  const result: string[] = [];
-  let commonIdx = Math.floor(Math.random() * COMMON_GREETINGS.length);
-  for (let i = 0; i < OTHER_GREETINGS.length; i++) {
-    // Insert a common greeting 60% of the time to make it frequent
-    if (i % 2 === 0 || i % 3 === 0) {
-      result.push(COMMON_GREETINGS[commonIdx % COMMON_GREETINGS.length]);
-      commonIdx++;
-    }
-    result.push(OTHER_GREETINGS[i]);
-  }
-  return result;
-};
-
-const GREETINGS = generateGreetings();
+import { AppLanguage, getDeviceLanguage } from '@/constants/i18n';
+import { buildGreetingSequence, getRandomGreetingIndex } from '@/services/greetingUtils';
 
 interface GreetingState {
   greetings: readonly string[];
   currentIndex: number;
   initialized: boolean;
-  initializeGreeting: () => void;
+  language: AppLanguage;
+  initializeGreeting: (language?: AppLanguage) => void;
   advanceGreeting: () => void;
+  setLanguagePreference: (language: AppLanguage) => void;
 }
 
 export const useGreetingStore = create<GreetingState>((set, get) => ({
-  greetings: GREETINGS,
+  greetings: buildGreetingSequence(getDeviceLanguage()),
   currentIndex: 0,
   initialized: false,
-  initializeGreeting: () =>
+  language: getDeviceLanguage(),
+  initializeGreeting: (preferredLanguage) =>
     set((state) => {
-      if (state.initialized) {
+      const nextLanguage = preferredLanguage || state.language;
+
+      if (state.initialized && state.language === nextLanguage) {
         return state;
       }
 
-      const randomIndex = Math.floor(Math.random() * state.greetings.length);
+      const nextGreetings = buildGreetingSequence(nextLanguage);
 
       return {
         ...state,
         initialized: true,
-        currentIndex: randomIndex,
+        language: nextLanguage,
+        greetings: nextGreetings,
+        currentIndex: getRandomGreetingIndex(nextGreetings),
       };
     }),
   advanceGreeting: () => {
     const { greetings, currentIndex } = get();
     set({ currentIndex: (currentIndex + 1) % greetings.length });
   },
+  setLanguagePreference: (language) =>
+    set((state) => {
+      if (state.language === language && state.initialized) {
+        return state;
+      }
+
+      const nextGreetings = buildGreetingSequence(language);
+
+      return {
+        ...state,
+        language,
+        initialized: true,
+        greetings: nextGreetings,
+        currentIndex: getRandomGreetingIndex(nextGreetings),
+      };
+    }),
 }));

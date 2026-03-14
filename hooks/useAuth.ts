@@ -8,6 +8,7 @@ import { getDeviceLanguage, normalizeLanguage } from '@/constants/i18n';
 import { normalizePlanTier } from '@/services/subscriptionPlan';
 import { showSharedUpdateNotification } from '@/services/notificationService';
 import { getMyInviteSummary, getMyPendingPremiumCelebration } from '@/services/referrals';
+import { isTransientNetworkError, retryAsync } from '@/services/networkRetry';
 
 const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
 const NON_RECOVERABLE_PATH_PREFIXES = [
@@ -71,27 +72,37 @@ export const useAuth = () => {
     };
 
     const fetchProfileMeta = async (userId: string) => {
-        let { data, error } = await supabase
-            .from('profiles')
-            .select('role, default_language, plan_tier, premium_referral_expires_at')
-            .eq('id', userId)
-            .single();
-
-        if (error && isMissingDefaultLanguageColumn(error.message)) {
-            const fallback = await supabase
+        return retryAsync(async () => {
+            let { data, error } = await supabase
                 .from('profiles')
-                .select('role, plan_tier, premium_referral_expires_at')
+                .select('role, default_language, plan_tier, premium_referral_expires_at')
                 .eq('id', userId)
-                .single();
-            data = fallback.data as any;
-            error = fallback.error as any;
-        }
+                .maybeSingle();
 
-        const normalizedRole = normalizeRole((data as any)?.role);
-        const planTier = normalizePlanTier((data as any)?.plan_tier, (data as any)?.premium_referral_expires_at);
-        const language = normalizeLanguage((data as any)?.default_language, getDeviceLanguage());
+            if (error && isMissingDefaultLanguageColumn(error.message)) {
+                const fallback = await supabase
+                    .from('profiles')
+                    .select('role, plan_tier, premium_referral_expires_at')
+                    .eq('id', userId)
+                    .maybeSingle();
+                data = fallback.data as any;
+                error = fallback.error as any;
+            }
 
-        return { normalizedRole, planTier, language };
+            if (error) {
+                throw new Error(error.message);
+            }
+
+            const normalizedRole = normalizeRole((data as any)?.role);
+            const planTier = normalizePlanTier((data as any)?.plan_tier, (data as any)?.premium_referral_expires_at);
+            const language = normalizeLanguage((data as any)?.default_language, getDeviceLanguage());
+
+            return { normalizedRole, planTier, language };
+        }, {
+            retries: 2,
+            delayMs: 900,
+            shouldRetry: isTransientNetworkError,
+        });
     };
 
     const hydratePendingReferralReward = async () => {
@@ -141,6 +152,24 @@ export const useAuth = () => {
         }
     };
 
+    const hydrateSignedInUser = async (sessionUser: NonNullable<typeof session>['user']) => {
+        await configureBillingForUser({
+            userId: sessionUser.id,
+            email: sessionUser.email ?? null,
+            phone: sessionUser.phone ?? null,
+            displayName:
+                typeof sessionUser.user_metadata?.full_name === 'string'
+                    ? sessionUser.user_metadata.full_name
+                    : null,
+        });
+
+        try {
+            await syncProfileState(sessionUser.id);
+        } catch (error: any) {
+            console.error('profile sync failed:', error?.message || error);
+        }
+    };
+
     useEffect(() => {
         // 1. Initial session check
         const checkSession = async () => {
@@ -160,16 +189,7 @@ export const useAuth = () => {
                 setUser(session?.user ?? null);
 
                 if (session?.user?.id) {
-                    await configureBillingForUser({
-                        userId: session.user.id,
-                        email: session.user.email ?? null,
-                        phone: session.user.phone ?? null,
-                        displayName:
-                            typeof session.user.user_metadata?.full_name === 'string'
-                                ? session.user.user_metadata.full_name
-                                : null,
-                    });
-                    await syncProfileState(session.user.id);
+                    await hydrateSignedInUser(session.user);
                 } else {
                     await configureBillingForUser({});
                     setRole(null);
@@ -200,16 +220,7 @@ export const useAuth = () => {
                 setUser(session?.user ?? null);
 
                 if (session?.user?.id) {
-                    await configureBillingForUser({
-                        userId: session.user.id,
-                        email: session.user.email ?? null,
-                        phone: session.user.phone ?? null,
-                        displayName:
-                            typeof session.user.user_metadata?.full_name === 'string'
-                                ? session.user.user_metadata.full_name
-                                : null,
-                    });
-                    await syncProfileState(session.user.id);
+                    await hydrateSignedInUser(session.user);
                 } else {
                     await configureBillingForUser({});
                     setRole(null);

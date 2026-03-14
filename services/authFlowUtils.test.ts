@@ -15,6 +15,7 @@ describe('authFlowUtils', () => {
 
   it('maps common Supabase auth errors to user-facing copy', () => {
     expect(mapRegistrationAuthError('User already registered')).toContain('already registered');
+    expect(mapRegistrationAuthError('Too many attempts from this network. Try again later.')).toContain('Too many attempts');
     expect(mapRegistrationAuthError('password should be at least 6 characters')).toContain('Password');
     expect(mapRegistrationAuthError('Unable to validate email address: invalid format')).toBe('Please enter a valid email address.');
   });

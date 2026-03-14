@@ -6,7 +6,7 @@ import { Mail, ArrowLeft } from 'lucide-react-native';
 
 import { Text, Screen, Card } from '@/components/Themed';
 import { isValidEmail, normalizeAuthEmail } from '@/services/authFlowUtils';
-import { supabase } from '@/services/supabase';
+import { requestPasswordReset } from '@/services/publicAuth';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
@@ -42,18 +42,15 @@ export default function ForgotPasswordScreen() {
             setLoading(true);
             setFeedback(null);
             const redirectTo = Linking.createURL('/reset-password');
-            const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
-
-            if (error) {
-                showMessage('Error', 'Could not send the recovery email.', 'error');
-                return;
-            }
+            await requestPasswordReset({ email: normalizedEmail, redirectTo });
 
             showMessage(
                 'Email sent',
                 'Check your inbox and open the link to reset your password.',
                 'success'
             );
+        } catch (error: any) {
+            showMessage('Error', error?.message || 'Could not send the recovery email.', 'error');
         } finally {
             setLoading(false);
         }

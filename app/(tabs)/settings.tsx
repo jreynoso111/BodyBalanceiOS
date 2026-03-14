@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, Alert, View as RNView, ScrollView, Image, RefreshControl, Platform, Pressable } from 'react-native';
 import { Link, Redirect } from 'expo-router';
 import { Text, View, Screen, Card } from '@/components/Themed';
-import { clearPersistedAuthState, supabase } from '@/services/supabase';
+import { signOutLocalSession, supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles, Trash2 } from 'lucide-react-native';
 import { exportLoansToCSV } from '@/services/exportService';
@@ -86,13 +86,7 @@ export default function SettingsScreen() {
 
         try {
             await AsyncStorage.removeItem(LAST_PROTECTED_PATH_KEY);
-
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-                console.warn('remote sign out failed:', error.message);
-            }
-
-            await clearPersistedAuthState();
+            await signOutLocalSession();
 
             setSession(null);
             setUser(null);
@@ -102,7 +96,7 @@ export default function SettingsScreen() {
             router.replace('/');
         } catch (error: any) {
             try {
-                await clearPersistedAuthState();
+                await signOutLocalSession();
                 setSession(null);
                 setUser(null);
                 setRole(null);

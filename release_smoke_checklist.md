@@ -5,6 +5,7 @@ Use this checklist before promoting a build to production or store review.
 ## Automated gate
 
 - Run `npm run verify:release`.
+- Run `npm run verify:supabase-config`.
 - Confirm the release test run includes:
   - billing readiness
   - auth registration / recovery validation helpers

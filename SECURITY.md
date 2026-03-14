@@ -14,6 +14,10 @@
 2. Fill in your project values.
 3. Keep `.env` out of git (already ignored in `.gitignore`).
 
+To verify remote Supabase secrets before a release, run:
+
+- `npm run verify:supabase-config`
+
 For the public contact relay, also configure:
 
 - `PUBLIC_CONTACT_ALLOWED_ORIGINS`
@@ -23,7 +27,35 @@ For the public contact relay, also configure:
 - `PUBLIC_CONTACT_MAX_IP_ATTEMPTS`
 - `PUBLIC_CONTACT_MAX_EMAIL_ATTEMPTS`
 
+Legacy Supabase secrets are also accepted for compatibility:
+
+- `PUBLIC_CONTACT_RATE_LIMIT_WINDOW_MS`
+- `PUBLIC_CONTACT_RATE_LIMIT_MAX`
+
 Default allowed origins in the function include `https://buddybalance.net`, `https://www.buddybalance.net`, and local development hosts. Override them if your production web domain differs.
+
+For public registration and password recovery, also configure:
+
+- `PUBLIC_AUTH_ALLOWED_ORIGINS`
+- `PUBLIC_AUTH_RESET_REDIRECT_TO`
+- `PUBLIC_AUTH_WINDOW_MINUTES`
+- `PUBLIC_AUTH_MAX_IP_ATTEMPTS`
+- `PUBLIC_AUTH_MAX_EMAIL_ATTEMPTS`
+
+Legacy Supabase secrets are also accepted for compatibility:
+
+- `PUBLIC_AUTH_ALLOWED_RESET_REDIRECTS`
+- `PUBLIC_AUTH_RATE_LIMIT_WINDOW_MS`
+- `PUBLIC_AUTH_RATE_LIMIT_MAX`
+
+The `public-auth` function now fronts `register` and `forgot-password` so the mobile app is no longer sending those requests straight to Supabase Auth without rate limiting. Reset links are sanitized to the Buddy Balance reset route before they are sent.
+
+For Android billing validation, configure these Supabase secrets:
+
+- `GOOGLE_PLAY_ALLOWED_PRODUCT_IDS`
+- `GOOGLE_PLAY_PACKAGE_NAME`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY`
 
 ## 3) Session storage
 

@@ -31,5 +31,13 @@
         "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "false"
       }
     }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

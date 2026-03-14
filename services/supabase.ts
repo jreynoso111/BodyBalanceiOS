@@ -23,6 +23,8 @@ const authStorageKeys = [
     `sb-${authStorageKeyPrefix}-auth-token`,
     `sb-${authStorageKeyPrefix}-auth-token-code-verifier`,
 ];
+const SUPABASE_FETCH_TIMEOUT_MS = 15000;
+const LOCAL_SIGN_OUT_TIMEOUT_MS = 4000;
 
 // Custom storage adapter to handle different platforms and avoid crashes in Node.js
 const customStorage = {
@@ -87,6 +89,25 @@ export async function clearPersistedAuthState() {
     );
 }
 
+const supabaseFetch: typeof fetch = async (input, init) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SUPABASE_FETCH_TIMEOUT_MS);
+
+    try {
+        return await fetch(input, {
+            ...init,
+            signal: init?.signal ?? controller.signal,
+        });
+    } catch (error: any) {
+        if (error?.name === 'AbortError') {
+            throw new Error(`Supabase request timed out after ${SUPABASE_FETCH_TIMEOUT_MS / 1000} seconds.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         storage: customStorage as any,
@@ -94,4 +115,22 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         persistSession: true,
         detectSessionInUrl: false,
     },
+    global: {
+        fetch: supabaseFetch,
+    }
 });
+
+export async function signOutLocalSession() {
+    try {
+        await Promise.race([
+            supabase.auth.signOut({ scope: 'local' }),
+            new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Local sign out timed out.')), LOCAL_SIGN_OUT_TIMEOUT_MS);
+            }),
+        ]);
+    } catch (error: any) {
+        console.warn('local sign out fallback:', error?.message || error);
+    } finally {
+        await clearPersistedAuthState().catch(() => null);
+    }
+}

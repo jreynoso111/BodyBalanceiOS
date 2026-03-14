@@ -1,13 +1,17 @@
 import { usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
+
+import { useAuthStore } from '@/store/authStore';
 import { useGreetingStore } from '@/store/greetingStore';
 
 const ROTATION_INTERVAL_MS = 9000;
 
 export function GreetingRotator() {
   const pathname = usePathname();
+  const language = useAuthStore((state) => state.language);
   const initializeGreeting = useGreetingStore((state) => state.initializeGreeting);
   const advanceGreeting = useGreetingStore((state) => state.advanceGreeting);
+  const setLanguagePreference = useGreetingStore((state) => state.setLanguagePreference);
   const bootstrappedRef = useRef(false);
   const previousPathRef = useRef<string | null>(null);
 
@@ -17,9 +21,13 @@ export function GreetingRotator() {
     }
 
     bootstrappedRef.current = true;
-    initializeGreeting();
+    initializeGreeting(language);
     advanceGreeting();
-  }, [initializeGreeting, advanceGreeting]);
+  }, [initializeGreeting, advanceGreeting, language]);
+
+  useEffect(() => {
+    setLanguagePreference(language);
+  }, [language, setLanguagePreference]);
 
   useEffect(() => {
     if (!pathname) {

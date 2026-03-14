@@ -14,6 +14,9 @@ export function mapRegistrationAuthError(message: string) {
   if (normalized.includes('already registered')) {
     return 'This email is already registered. Try signing in or reset your password.';
   }
+  if (normalized.includes('too many attempts') || normalized.includes('rate limit')) {
+    return 'Too many attempts were made from this device or email. Wait a few minutes and try again.';
+  }
   if (normalized.includes('password should be at least')) {
     return getPasswordPolicyMessage();
   }

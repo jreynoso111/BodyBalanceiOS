@@ -5,7 +5,7 @@ import { usePathname } from 'expo-router';
 import { Card, Text } from '@/components/Themed';
 import { getCachedBiometricLockEnabled, setCachedBiometricLockEnabled } from '@/services/appLock';
 import { getBiometricCapability, promptBiometricVerification } from '@/services/biometrics';
-import { supabase } from '@/services/supabase';
+import { signOutLocalSession } from '@/services/supabase';
 import { getOrCreateUserPreferences } from '@/services/userPreferences';
 import { useAuthStore } from '@/store/authStore';
 
@@ -216,7 +216,7 @@ export function AppBiometricGate() {
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => {
-              void supabase.auth.signOut();
+              void signOutLocalSession();
             }}
           >
             <Text style={styles.secondaryButtonText}>Sign out</Text>

@@ -13,6 +13,7 @@ import {
     validateRegistrationFields,
     validateVerificationCodeInput,
 } from '@/services/authFlowUtils';
+import { requestSignupCode } from '@/services/publicAuth';
 import { supabase } from '@/services/supabase';
 import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWithGoogle } from '@/services/oauth';
 import { useAuthStore } from '@/store/authStore';
@@ -93,31 +94,25 @@ export default function RegisterScreen() {
             setFeedback(null);
             setLoading(true);
 
-            const { error } = await withTimeout(
-                supabase.auth.signInWithOtp({
+            await withTimeout(
+                requestSignupCode({
                     email: normalizedEmail,
-                    options: {
-                        shouldCreateUser: true,
-                        data: {
-                            full_name: fullName.trim(),
-                        },
-                    },
+                    fullName,
                 })
             );
-
-            if (error) {
-                showMessage('Verification failed', mapRegistrationAuthError(error.message), 'error');
-                return;
-            }
 
             setStep('verify');
             showMessage(
                 'Verification code sent',
-                'Enter the 6-digit code sent to your email to finish creating your account.',
+                'If a verification code can be sent to this email, enter the 6-digit code from your inbox to finish creating your account.',
                 'info'
             );
         } catch (error: any) {
-            showMessage('Verification failed', error?.message || 'Could not send a verification code right now.', 'error');
+            showMessage(
+                'Verification failed',
+                mapRegistrationAuthError(error?.message || 'Could not send a verification code right now.'),
+                'error'
+            );
         } finally {
             setLoading(false);
         }
@@ -329,6 +324,10 @@ export default function RegisterScreen() {
                 </>
             ) : (
                 <>
+                    <Text style={[styles.verifyHint, { color: theme.secondaryText }]}>
+                        Enter the code from your inbox. If no code arrives, use sign in or password recovery instead of retrying indefinitely.
+                    </Text>
+
                     <RNView style={styles.inputGroup}>
                         <Text style={[styles.label, { color: theme.secondaryText }]}>Verification Code</Text>
                         <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
@@ -474,7 +473,7 @@ export default function RegisterScreen() {
                             <Text style={[styles.webBody, { color: theme.secondaryText }]}>
                                 {step === 'details'
                                     ? 'Set up your account credentials first. Buddy Balance will send a short verification code before final activation.'
-                                    : 'Enter the six-digit code from your inbox to finish the account setup and unlock the web account center.'}
+                                    : 'Enter the six-digit code from your inbox. If no code arrives, use sign in or password recovery instead.'}
                             </Text>
                         </RNView>
                         <Card style={styles.authCard}>{form}</Card>
@@ -522,6 +521,12 @@ const styles = StyleSheet.create({
         marginTop: 10,
         fontSize: 15,
         lineHeight: 24,
+        color: '#64748B',
+    },
+    verifyHint: {
+        marginBottom: 14,
+        fontSize: 13,
+        lineHeight: 20,
         color: '#64748B',
     },
     backButton: {

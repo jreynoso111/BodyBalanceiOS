@@ -1,74 +1,39 @@
-# Buddy Balance Release & Security Review
+# Buddy Balance Security and Readiness Review
 
-## Executive summary
+## Executive Summary
 
-The code and release blockers identified in the last review have now been corrected in the repo and database, with one remaining external security setting still pending in Supabase Auth.
+The codebase is materially stronger than earlier in the audit cycle: manual Premium entitlement changes are blocked, public contact now fails closed when CAPTCHA secrets are missing, account deletion exists in-app, public mobile auth flows now go through a rate-limited Edge Function, iOS no longer exposes a live Android-only billing CTA, and `eas.json` includes an Android `submit` profile. I did not find a remaining critical code-level blocker. The main remaining gap is operational: final Android launch-sensitive paths still need physical-device validation and Google Play Console setup.
 
-Current status:
+## Low Severity
 
-- `npm run typecheck`: passed
-- `npm run doctor`: passed
-- `npm run export:prod`: passed
-- Supabase security advisor: only one remaining warning
+### 1. Physical-device Android validation is still required for the final launch-sensitive paths
 
-## Resolved items
+- Rule ID: QA-DEVICE-001
+- Severity: Low
+- Location: `/Users/jreynoso/I Got You iOS/release_smoke_checklist.md:16`
+- Evidence:
+  - The release checklist still requires real-device checks for Google Play purchase, push delivery, and other device-dependent flows.
+  - The Android emulator in this environment does not provide stable host-webcam QR scanning for a physical QR code.
+- Impact:
+  - The app can look code-complete while still missing real-world validation for the exact Android-only flows that matter at launch.
+- Fix:
+  - Run the documented smoke checklist on a physical Android device before release.
+- Mitigation:
+  - Treat Android physical-device validation as a release gate, not an optional post-check.
+- False positive notes:
+  - This is an operational readiness gap, not a source-code bug.
 
-### RES-001 - Admin password reset deep link aligned
+## Notable Improvements Already Landed
 
-- Updated `/Users/jreynoso/I Got You/supabase/functions/admin-user-management/index.ts`
-- The fallback reset redirect now uses `buddybalance://reset-password` instead of the obsolete `igotyou://reset-password`.
+- Manual admin Premium toggles are disabled in UI and backend.
+- Public contact no longer silently skips CAPTCHA in production when the Turnstile secret is missing.
+- Account deletion exists inside the app and is backed by an Edge Function.
+- Mobile `register` and `forgot-password` now use `public-auth`, which applies IP/email throttling and reset redirect sanitization before touching Supabase Auth.
+- iOS no longer renders a direct Premium purchase CTA for an Android-only billing path.
+- `eas.json` now includes `submit.production` for Android internal-track / draft handoff.
+- Release automation now tests billing readiness, auth helper validation, merge/cancel decision logic, account deletion client flow, CSV sanitization, and notification helper logic.
 
-### RES-002 - Expo notifications plugin added for release builds
+## Verification Notes
 
-- Updated `/Users/jreynoso/I Got You/app.json`
-- The app config now includes `expo-notifications`, which reduces native iOS notification drift risk for release builds.
-
-### RES-003 - Biometric lock is now enforced
-
-- Added `/Users/jreynoso/I Got You/components/AppBiometricGate.tsx`
-- Added `/Users/jreynoso/I Got You/services/appLock.ts`
-- Updated `/Users/jreynoso/I Got You/app/_layout.tsx`
-- Updated `/Users/jreynoso/I Got You/app/security.tsx`
-
-The app now:
-
-- reads biometric preference per user
-- enforces unlock on app entry for users with biometric lock enabled
-- re-locks on foreground return
-- allows retry or sign-out from the lock screen
-
-### RES-004 - Database function hardening applied
-
-- Added `/Users/jreynoso/I Got You/supabase/migrations/20260308165702_fix_function_search_paths.sql`
-- Applied migration successfully to Supabase
-
-The prior `function_search_path_mutable` warnings for `public.handle_updated_at` and `public.update_loan_status_on_payment` are no longer present in the security advisor.
-
-### RES-005 - Client-side password policy strengthened
-
-- Added `/Users/jreynoso/I Got You/services/passwordPolicy.ts`
-- Updated:
-  - `/Users/jreynoso/I Got You/app/(auth)/register.tsx`
-  - `/Users/jreynoso/I Got You/app/(auth)/reset-password.tsx`
-  - `/Users/jreynoso/I Got You/app/security.tsx`
-
-Passwords now require at least 10 characters with uppercase, lowercase, and a number.
-
-## Remaining item
-
-### REM-001 - Supabase leaked-password protection is still disabled
-
-- Source: Supabase security advisor
-- Status: not configurable from this repo
-- Required action: enable leaked-password protection in Supabase Auth settings
-- Reference: [Supabase password security guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
-
-## Recommendation
-
-The codebase is now in substantially better shape for release. I would not treat it as fully ready until `REM-001` is enabled in Supabase Auth and one final physical-device iPhone pass is completed for:
-
-- biometric unlock at cold start
-- biometric unlock after background resume
-- forgot password
-- admin-triggered password reset
-- notifications permission and delivery behavior
+- `npm run verify:release` passes in the current repo state.
+- I could not query Supabase advisors from MCP during this review because the MCP transport reported `Auth required`, so advisor output was not available from this session.

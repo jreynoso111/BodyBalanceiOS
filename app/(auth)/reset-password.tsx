@@ -6,7 +6,7 @@ import { Lock, ArrowLeft } from 'lucide-react-native';
 
 import { Text, Screen, Card } from '@/components/Themed';
 import { getPasswordPolicyMessage, isStrongPassword } from '@/services/passwordPolicy';
-import { supabase } from '@/services/supabase';
+import { signOutLocalSession, supabase } from '@/services/supabase';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
@@ -38,6 +38,7 @@ export default function ResetPasswordScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [initializing, setInitializing] = useState(true);
+    const [recoveryReady, setRecoveryReady] = useState(false);
     const [feedback, setFeedback] = useState<{ tone: 'error' | 'success' | 'info'; text: string } | null>(null);
 
     const showMessage = (title: string, message: string, tone: 'error' | 'success' | 'info') => {
@@ -55,6 +56,11 @@ export default function ResetPasswordScreen() {
             }
 
             if (!sourceUrl) {
+                setRecoveryReady(false);
+                setFeedback({
+                    tone: 'info',
+                    text: 'Open this screen from the password reset link sent to your email.',
+                });
                 setInitializing(false);
                 return;
             }
@@ -66,8 +72,17 @@ export default function ResetPasswordScreen() {
                     refresh_token: refreshToken,
                 });
                 if (error) throw error;
+                setRecoveryReady(true);
+                return;
             }
+
+            setRecoveryReady(false);
+            setFeedback({
+                tone: 'error',
+                text: 'The recovery link is invalid or expired. Request a new reset email.',
+            });
         } catch {
+            setRecoveryReady(false);
             showMessage('Error', 'The recovery link is invalid or expired.', 'error');
         } finally {
             setInitializing(false);
@@ -79,6 +94,11 @@ export default function ResetPasswordScreen() {
     }, [initializeRecoverySession]);
 
     const onUpdatePassword = async () => {
+        if (!recoveryReady) {
+            showMessage('Error', 'Request a new password reset link before setting a new password.', 'error');
+            return;
+        }
+
         if (!password || !confirmPassword) {
             showMessage('Error', 'Please complete both fields.', 'error');
             return;
@@ -102,7 +122,7 @@ export default function ResetPasswordScreen() {
             return;
         }
 
-        await supabase.auth.signOut();
+        await signOutLocalSession();
         showMessage('Done', 'Password updated. Sign in with your new password.', 'success');
         router.replace('/(auth)/login');
     };
@@ -116,6 +136,18 @@ export default function ResetPasswordScreen() {
                 <RNView style={styles.loadingBox}>
                     <ActivityIndicator size="small" color={theme.loadingIndicator} />
                     <Text style={[styles.loadingText, { color: theme.secondaryText }]}>Validating link...</Text>
+                </RNView>
+            ) : !recoveryReady ? (
+                <RNView style={styles.loadingBox}>
+                    <Text style={[styles.loadingText, { color: theme.secondaryText }]}>
+                        Request a fresh recovery email to continue.
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => router.replace('/(auth)/forgot-password')}
+                        style={[styles.primaryButton, { backgroundColor: theme.primaryButton }]}
+                    >
+                        <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>Request new reset link</Text>
+                    </TouchableOpacity>
                 </RNView>
             ) : (
                 <>
