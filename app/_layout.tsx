@@ -18,7 +18,6 @@ import * as SystemUI from 'expo-system-ui';
 
 import { ReferralRewardModal } from '@/components/ReferralRewardModal';
 import { AppBiometricGate } from '@/components/AppBiometricGate';
-import { GreetingRotator } from '@/components/GreetingRotator';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -144,7 +143,6 @@ function RootLayoutNav() {
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         </Stack>
         <AppBiometricGate />
-        <GreetingRotator />
         <ReferralRewardModal />
       </ThemeProvider>
     </SafeAreaProvider>

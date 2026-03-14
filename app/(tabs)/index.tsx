@@ -9,7 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getCurrencySymbol } from '@/constants/Currencies';
-import { useGreetingStore } from '@/store/greetingStore';
+import { getRandomGreetingIndex, buildGreetingSequence } from '@/services/greetingUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isTransientNetworkError, retryAsync } from '@/services/networkRetry';
 
@@ -39,8 +39,14 @@ type PaymentRecord = {
 };
 
 export default function DashboardScreen() {
-  const { user } = useAuthStore();
-  const greeting = useGreetingStore((state) => state.greetings[state.currentIndex]);
+  const { user, language } = useAuthStore();
+  const [greetingState, setGreetingState] = React.useState(() => {
+    const sequence = buildGreetingSequence(language);
+    return {
+      sequence,
+      index: getRandomGreetingIndex(sequence),
+    };
+  });
   const [accountName, setAccountName] = useState('');
   const [friendCode, setFriendCode] = useState('');
   const [friendCodeReady, setFriendCodeReady] = useState(false);
@@ -60,7 +66,27 @@ export default function DashboardScreen() {
   const bottomInset = Math.max(insets.bottom, 12);
   const fabBottomOffset = bottomInset + 16;
   const scrollBottomPadding = fabBottomOffset + 84;
+  const greeting = greetingState.sequence[greetingState.index] || 'Hello';
   const greetingTitle = accountName.trim() ? `${greeting}, ${accountName.trim()}!` : `${greeting}!`;
+
+  React.useEffect(() => {
+    const sequence = buildGreetingSequence(language);
+    setGreetingState({
+      sequence,
+      index: getRandomGreetingIndex(sequence),
+    });
+  }, [language]);
+
+  React.useEffect(() => {
+    const intervalId = setInterval(() => {
+      setGreetingState((current) => ({
+        ...current,
+        index: current.sequence.length ? (current.index + 1) % current.sequence.length : 0,
+      }));
+    }, 9000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handleInviteToApp = async () => {
     if (!friendCodeReady || !friendCode) {
