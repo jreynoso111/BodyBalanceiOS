@@ -22,6 +22,16 @@ const SECTIONS = [
       'We use account and record data to authenticate you, render balances, keep contact history accurate, power notifications, support Premium and admin experiences, respond to support requests, and improve reliability of the product.',
   },
   {
+    title: 'Photos and media access',
+    body:
+      'If you choose to add a profile photo or attach an image to a record, Buddy Balance requests access to your device photos only so you can pick that image inside the app. The selected image may then be uploaded to Buddy Balance storage so it can appear in your account or related record screens. We do not ask for photo access for advertising or unrelated tracking.',
+  },
+  {
+    title: 'Photo storage and deletion',
+    body:
+      'Profile photos and record-related images remain associated with your account data until you replace or remove them, or until the related account data is deleted. When you remove a profile photo in the app, Buddy Balance attempts to delete the stored file from app storage as part of that update flow.',
+  },
+  {
     title: 'Premium, admin, and support context',
     body:
       'If your account has Premium access, the app may enable additional features such as exports and Premium labeling in the interface. If your account has admin privileges, admin tools can expose broader operational data required to review users, requests, and support communications.',
@@ -51,6 +61,7 @@ const SECTIONS = [
 const HIGHLIGHTS = [
   'Your account data is stored so the app can authenticate you and render balances correctly.',
   'Shared records and event history can be visible to the other person involved in that relationship.',
+  'Photos are accessed only when you choose a profile or record image, then stored for that feature.',
   'Buddy Balance is not a payment processor; it is a tracking and coordination product.',
 ] as const;
 

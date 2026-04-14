@@ -6,6 +6,7 @@ import { BrandLogo } from '@/components/BrandLogo';
 import { useI18n } from '@/hooks/useI18n';
 import { useAuthStore } from '@/store/authStore';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { getMembershipStatus } from '@/services/subscriptionPlan';
 
 export default function TabLayout() {
   const { theme } = useAppTheme();
@@ -13,6 +14,7 @@ export default function TabLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { user, initialized, planTier } = useAuthStore();
+  const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
 
   if (initialized && !user) {
     return <Redirect href="/" />;
@@ -56,9 +58,9 @@ export default function TabLayout() {
           <TouchableOpacity style={styles.headerBrandButton} onPress={() => goToTab('home')}>
             <View style={styles.headerBrandWrap}>
               <BrandLogo size="sm" showTagline={false} showWordmark={false} />
-              {planTier === 'premium' ? (
+              {membershipStatus !== 'free' ? (
                 <View style={styles.premiumBadge}>
-                  <Text style={styles.premiumBadgeText}>Premium</Text>
+                  <Text style={styles.premiumBadgeText}>{membershipStatus === 'trial' ? 'Trial' : 'Premium'}</Text>
                 </View>
               ) : null}
             </View>

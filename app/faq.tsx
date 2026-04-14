@@ -53,12 +53,12 @@ const FAQ_ITEMS = [
   {
     question: 'What does Premium change?',
     answer:
-      'Premium unlocks premium-only capabilities such as export and broader record management benefits. When the active account is Premium, the app can show that plan status in the header and in Settings.',
+      'New accounts start with a 21-day free trial that unlocks the full app experience. After that trial ends, Premium keeps paid features such as exports and other membership-only tools active.',
   },
   {
     question: 'Can I export my records?',
     answer:
-      'Yes. Premium users can go to Settings and use "Export Data (CSV)" to download records, payments, and related contact data.',
+      'Yes. During the 21-day free trial, and later with Premium, you can go to Settings and use "Export Data (CSV)" to download records, payments, and related contact data.',
   },
   {
     question: 'Does Buddy Balance move real money?',

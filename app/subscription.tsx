@@ -7,6 +7,7 @@ import { Card, Screen, Text } from '@/components/Themed';
 import {
   describePackage,
   fetchPremiumOffering,
+  getBillingEntitlementIds,
   getBillingReadiness,
   getBillingEntitlementId,
   getBillingUnavailableReason,
@@ -14,7 +15,12 @@ import {
   purchasePremiumPackage,
   restorePremiumAccess,
 } from '@/services/billing';
-import { PLAN_LIMITS } from '@/services/subscriptionPlan';
+import {
+  getMembershipStatus,
+  getPremiumTrialDaysRemaining,
+  getPremiumTrialEndsAt,
+  PREMIUM_TRIAL_DAYS,
+} from '@/services/subscriptionPlan';
 import { formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
 import { useAuthStore } from '@/store/authStore';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
@@ -23,14 +29,24 @@ export default function SubscriptionScreen() {
   const planTier = useAuthStore((state) => state.planTier);
   const user = useAuthStore((state) => state.user);
   const initialized = useAuthStore((state) => state.initialized);
-  const planTitle = planTier === 'premium' ? 'Premium active' : 'Free plan';
+  const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
+  const trialDaysRemaining = getPremiumTrialDaysRemaining(user?.created_at);
+  const trialEndsAt = getPremiumTrialEndsAt(user?.created_at);
+  const planTitle =
+    membershipStatus === 'premium'
+      ? 'Premium active'
+      : membershipStatus === 'trial'
+      ? `Trial active • ${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'} left`
+      : 'Free plan';
   const unavailableReason = getBillingUnavailableReason();
   const [purchasePending, setPurchasePending] = React.useState(false);
   const [restorePending, setRestorePending] = React.useState(false);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [sendingInvite, setSendingInvite] = React.useState(false);
   const [referralSummary, setReferralSummary] = React.useState<InviteSummary | null>(null);
-  const [premiumPackageLabel, setPremiumPackageLabel] = React.useState('Google Play lifetime access');
+  const [premiumPackageLabel, setPremiumPackageLabel] = React.useState('Google Play Premium access');
+  const [premiumPackageOptions, setPremiumPackageOptions] = React.useState<Array<{ id: string; label: string }>>([]);
+  const [selectedPackageId, setSelectedPackageId] = React.useState<string>('');
   const [billingReady, setBillingReady] = React.useState(false);
   const [billingStatusLoading, setBillingStatusLoading] = React.useState(Platform.OS === 'android' && isBillingAvailable());
   const [billingStatusReason, setBillingStatusReason] = React.useState<string | null>(unavailableReason);
@@ -47,12 +63,21 @@ export default function SubscriptionScreen() {
     const loadPremiumOffering = async () => {
       if (Platform.OS !== 'android') return;
       try {
-        const { featuredPackage } = await fetchPremiumOffering();
+        const { featuredPackage, offering } = await fetchPremiumOffering();
         if (!active) return;
+        const products = offering?.products || [];
+        const options = products.map((product) => ({
+          id: product.id,
+          label: describePackage(product),
+        }));
+        setPremiumPackageOptions(options);
+        setSelectedPackageId((current) => current || featuredPackage?.id || options[0]?.id || '');
         setPremiumPackageLabel(describePackage(featuredPackage));
       } catch {
         if (!active) return;
-        setPremiumPackageLabel('Google Play lifetime access');
+        setPremiumPackageLabel('Google Play Premium access');
+        setPremiumPackageOptions([]);
+        setSelectedPackageId('');
       }
     };
 
@@ -89,7 +114,7 @@ export default function SubscriptionScreen() {
     setPurchasePending(true);
 
     try {
-      await purchasePremiumPackage();
+      await purchasePremiumPackage(selectedPackageId || undefined);
       Alert.alert('Premium activated', 'Your membership is now active.');
     } catch (error: any) {
       Alert.alert('Purchase unavailable', error?.message || 'Premium checkout is not available right now.');
@@ -172,26 +197,38 @@ export default function SubscriptionScreen() {
     return (
       <WebAccountLayout
         eyebrow="Membership"
-        title={planTier === 'premium' ? 'Premium is active on this account.' : 'Free plan with a clear upgrade path.'}
-        description="Membership on web reads the same plan state as the app. Premium, referrals, limits, and manual admin upgrades all show here."
+        title={
+          membershipStatus === 'premium'
+            ? 'Premium is active on this account.'
+            : membershipStatus === 'trial'
+            ? `Your ${PREMIUM_TRIAL_DAYS}-day free trial is active.`
+            : 'Your free trial has ended.'
+        }
+        description="Membership on web reads the same plan state as the app. Trial access, Premium, referrals, and billing readiness all show here."
       >
         <RNView style={styles.webGrid}>
           <Card style={styles.webPanel}>
             <Text style={styles.webPanelTitle}>Current plan</Text>
             <Text style={styles.webPlanValue}>{planTitle}</Text>
             <Text style={styles.webBody}>
-              Buddy Balance Pro removes the friend and active record limits. Premium purchases are handled in the Android app through Google Play.
+              {membershipStatus === 'trial'
+                ? `Your account currently has full feature access through a ${PREMIUM_TRIAL_DAYS}-day free trial that started when you registered.`
+                : 'Premium subscriptions are handled in the Android app through Google Play.'}
             </Text>
-            {planTier !== 'premium' ? <Text style={styles.webBody}>To purchase Premium right now, open the Android app and complete checkout with Google Play.</Text> : null}
+            {membershipStatus === 'trial' && trialEndsAt ? (
+              <Text style={styles.webBody}>Trial access ends on {trialEndsAt.toLocaleDateString()}.</Text>
+            ) : null}
+            {membershipStatus !== 'premium' ? <Text style={styles.webBody}>To purchase Premium right now, open the Android app and complete checkout with Google Play.</Text> : null}
           </Card>
 
           <Card style={styles.webPanel}>
             <Text style={styles.webPanelTitle}>What Premium unlocks</Text>
             {[
-              `Unlimited linked friends instead of ${PLAN_LIMITS.free.linkedFriends}`,
-              `Unlimited active records instead of ${PLAN_LIMITS.free.activeRecords}`,
+              'Access after your 21-day free trial ends',
+              'CSV exports and PDF sharing after the trial window',
               'Priority support for account issues',
-              ...(planTier === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
+              'Annual billing handled through Google Play',
+              ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
             ].map((benefit) => (
               <RNView key={benefit} style={styles.webBenefitRow}>
                 <Check size={15} color="#10B981" />
@@ -213,7 +250,7 @@ export default function SubscriptionScreen() {
               <Text style={styles.webReferralCode}>Your code: {referralSummary.inviteCode || 'Loading...'}</Text>
             </Card>
 
-            {planTier !== 'premium' ? (
+            {membershipStatus !== 'premium' ? (
               <Card style={styles.webPanel}>
                 <Text style={styles.webPanelTitle}>Send an invite</Text>
                 <TextInput
@@ -252,9 +289,11 @@ export default function SubscriptionScreen() {
           <Text style={styles.heroEyebrow}>Plan</Text>
           <Text style={styles.heroTitle}>{planTitle}</Text>
           <Text style={styles.heroText}>
-            Buddy Balance Pro removes the friend and active record limits. {premiumPackageLabel}.
+            {membershipStatus === 'trial'
+              ? `You have full access during your ${PREMIUM_TRIAL_DAYS}-day free trial.`
+              : 'Buddy Balance switches to Premium after the free trial ends.'} {premiumPackageLabel}.
           </Text>
-          {planTier !== 'premium' && Platform.OS === 'android' ? (
+          {membershipStatus !== 'premium' && Platform.OS === 'android' ? (
             <RNView style={styles.ctaGroup}>
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -262,8 +301,32 @@ export default function SubscriptionScreen() {
                 onPress={() => void handlePurchase()}
                 disabled={purchasePending || (Platform.OS === 'android' && !billingReady)}
               >
-                {purchasePending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Buy Premium</Text>}
+                {purchasePending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {selectedPackageId ? `Buy ${selectedPackageId.includes('month') ? 'monthly' : selectedPackageId.includes('year') || selectedPackageId.includes('annual') ? 'annual' : 'Premium'}` : 'Buy Premium'}
+                  </Text>
+                )}
               </TouchableOpacity>
+
+              {premiumPackageOptions.length > 1 ? (
+                <RNView style={styles.packageOptions}>
+                  {premiumPackageOptions.map((option) => {
+                    const selected = selectedPackageId === option.id;
+                    return (
+                      <TouchableOpacity
+                        key={option.id}
+                        activeOpacity={0.9}
+                        style={[styles.packageOptionButton, selected && styles.packageOptionButtonSelected]}
+                        onPress={() => setSelectedPackageId(option.id)}
+                      >
+                        <Text style={[styles.packageOptionText, selected && styles.packageOptionTextSelected]}>{option.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </RNView>
+              ) : null}
 
               {Platform.OS === 'android' ? (
                 <TouchableOpacity
@@ -284,7 +347,7 @@ export default function SubscriptionScreen() {
                 <Text style={styles.ctaHint}>{billingStatusReason || unavailableReason}</Text>
               )}
             </RNView>
-          ) : planTier !== 'premium' ? (
+          ) : membershipStatus !== 'premium' ? (
             <RNView style={styles.ctaGroup}>
               <Text style={styles.ctaHint}>{unavailableReason}</Text>
             </RNView>
@@ -294,11 +357,12 @@ export default function SubscriptionScreen() {
         <Card style={styles.compareCard}>
           <Text style={styles.sectionTitle}>What Buddy Balance Pro unlocks</Text>
           {[
-            `Unlimited linked friends instead of ${PLAN_LIMITS.free.linkedFriends}`,
-            `Unlimited active records instead of ${PLAN_LIMITS.free.activeRecords}`,
+            'Continued access after your free trial ends',
+            'CSV exports and PDF sharing after the trial window',
             'Priority support for account issues',
-            ...(planTier === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
-            `Premium plan tier: "${getBillingEntitlementId()}"`,
+            premiumPackageOptions.length > 1 ? 'Monthly or annual Google Play membership' : 'Annual Google Play membership',
+            ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
+            `Premium plan ids: "${getBillingEntitlementIds().join(', ') || getBillingEntitlementId()}"`,
           ].map((benefit) => (
             <RNView key={benefit} style={styles.benefitRow}>
               <RNView style={styles.benefitIcon}>
@@ -320,12 +384,12 @@ export default function SubscriptionScreen() {
             {billingStatusLoading
               ? 'The app is verifying the Google Play connection and backend validation before enabling checkout.'
               : billingReady
-              ? 'Premium purchases and restores now run through Google Play on Android. The server validates the purchase token before the app marks this account as Premium.'
+              ? 'Premium subscriptions and restores now run through Google Play on Android. The server validates the purchase token before the app marks this account as Premium.'
               : billingStatusReason || unavailableReason}
           </Text>
           {Platform.OS === 'android' ? (
             <Text style={styles.stateFootnote}>
-              Current status: the app expects the Android product id `EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID` and validates completed purchases through the `google-play-sync` Supabase function.
+              Current status: the app expects `EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID` and optionally `EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID`, then validates completed purchases through the `google-play-sync` Supabase function.
             </Text>
           ) : null}
           {referralSummary ? (
@@ -338,7 +402,7 @@ export default function SubscriptionScreen() {
           {Platform.OS === 'android' && isBillingAvailable() ? <Text style={styles.androidHint}>Premium SKU: {getBillingEntitlementId()}</Text> : null}
         </Card>
 
-        {planTier !== 'premium' && referralSummary ? (
+        {membershipStatus !== 'premium' && referralSummary ? (
           <Card style={styles.inviteCard}>
             <Text style={styles.sectionTitle}>Invite 3 people</Text>
             <Text style={styles.inviteText}>
@@ -448,6 +512,30 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  packageOptions: {
+    gap: 10,
+  },
+  packageOptionButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  packageOptionButtonSelected: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#EEF2FF',
+  },
+  packageOptionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  packageOptionTextSelected: {
+    color: '#312E81',
   },
   ctaHint: {
     fontSize: 14,

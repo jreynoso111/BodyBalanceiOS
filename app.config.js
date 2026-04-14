@@ -13,6 +13,12 @@ module.exports = ({ config }) => {
   const appName = readEnv('APP_NAME', 'Buddy Balance');
   const appSlug = readEnv('APP_SLUG', 'buddy-balance');
   const appEnv = readEnv('APP_ENV', 'development');
+  const easBuildPlatform = readEnv('EAS_BUILD_PLATFORM', '');
+  const androidPremiumProductId = readEnv(
+    'EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID',
+    readEnv('EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID', '')
+  );
+  const androidPremiumMonthlyProductId = readEnv('EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID', '');
   const googleOAuthEnabled = String(process.env.EXPO_PUBLIC_ENABLE_GOOGLE_AUTH || '').toLowerCase() === 'true';
   const ios = expo.ios || bundleIdentifier
     ? {
@@ -26,6 +32,16 @@ module.exports = ({ config }) => {
         ...(androidPackage ? { package: androidPackage } : {}),
       }
     : undefined;
+
+  const requiresAndroidBillingProductId =
+    Boolean(androidPackage) && appEnv === 'production' && (!easBuildPlatform || easBuildPlatform === 'android');
+
+  if (requiresAndroidBillingProductId && !androidPremiumProductId && !androidPremiumMonthlyProductId) {
+    throw new Error(
+      'Missing EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID or EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID for Android production config. ' +
+        'Set at least one before running the Android production build and make sure the same subscription ID exists in Google Play Console.'
+    );
+  }
 
   return {
     ...config,

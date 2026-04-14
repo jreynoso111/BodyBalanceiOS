@@ -72,19 +72,17 @@ async function getGoogleAccessToken() {
   return String(data.access_token);
 }
 
-async function fetchProductPurchase({
+async function fetchSubscriptionPurchase({
   packageName,
-  productId,
   purchaseToken,
 }: {
   packageName: string;
-  productId: string;
   purchaseToken: string;
 }) {
   const accessToken = await getGoogleAccessToken();
   const url =
     `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}` +
-    `/purchases/products/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}`;
+    `/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`;
 
   const response = await fetch(url, {
     method: 'GET',
@@ -96,13 +94,13 @@ async function fetchProductPurchase({
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Google Play purchase lookup failed (${response.status}): ${errorText}`);
+    throw new Error(`Google Play subscription lookup failed (${response.status}): ${errorText}`);
   }
 
   return response.json();
 }
 
-async function fetchInAppProduct({
+async function fetchSubscriptionProduct({
   packageName,
   productId,
 }: {
@@ -112,7 +110,7 @@ async function fetchInAppProduct({
   const accessToken = await getGoogleAccessToken();
   const url =
     `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}` +
-    `/inappproducts/${encodeURIComponent(productId)}`;
+    `/subscriptions/${encodeURIComponent(productId)}`;
 
   const response = await fetch(url, {
     method: 'GET',
@@ -124,29 +122,27 @@ async function fetchInAppProduct({
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Google Play product lookup failed (${response.status}): ${errorText}`);
+    throw new Error(`Google Play subscription lookup failed (${response.status}): ${errorText}`);
   }
 
   return response.json();
 }
 
 function resolvePlanTierFromGooglePurchase(purchase: any) {
-  // Check the raw numeric state first (Google Play ProductPurchase returns integer 0 for purchased).
-  if (purchase?.purchaseState === 0) {
-    return 'premium';
-  }
-
-  const purchaseState = String(
-    purchase?.purchaseStateContext?.purchaseState ||
-      purchase?.purchaseState ||
-      purchase?.purchaseStatus ||
-      ''
-  )
+  const subscriptionState = String(purchase?.subscriptionState || '')
     .toUpperCase()
     .trim();
+  const latestExpiry = Array.isArray(purchase?.lineItems)
+    ? purchase.lineItems.reduce((latest: number, item: any) => {
+        const next = Date.parse(String(item?.expiryTime || ''));
+        return Number.isFinite(next) && next > latest ? next : latest;
+      }, 0)
+    : 0;
 
-  // Also support textual states if they appear
-  if (purchaseState === 'PURCHASED' || purchaseState === 'PURCHASE_STATE_PURCHASED' || purchaseState === '0') {
+  if (
+    (subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE' || subscriptionState === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD') &&
+    latestExpiry > Date.now()
+  ) {
     return 'premium';
   }
 
@@ -213,10 +209,6 @@ Deno.serve(async (req) => {
     const isSubscription = Boolean(body?.is_subscription);
     const mode = String(body?.mode || '').trim().toLowerCase();
 
-    if (isSubscription) {
-      return json({ error: 'This function currently validates one-time Google Play products only.' }, 400);
-    }
-
     if (!packageName) {
       return json({ error: 'Missing package_name' }, 400);
     }
@@ -234,7 +226,7 @@ Deno.serve(async (req) => {
     }
 
     if (mode === 'health') {
-      const product = await fetchInAppProduct({
+      const product = await fetchSubscriptionProduct({
         packageName,
         productId,
       });
@@ -245,7 +237,8 @@ Deno.serve(async (req) => {
         appUserId: authData.user.id,
         packageName,
         productId,
-        productStatus: product?.status || product?.purchaseType || null,
+        productStatus: product?.basePlans?.length ? 'ACTIVE' : product?.packageName || null,
+        isSubscription,
       });
     }
 
@@ -253,9 +246,8 @@ Deno.serve(async (req) => {
       return json({ error: 'Missing purchase_token' }, 400);
     }
 
-    const purchase = await fetchProductPurchase({
+    const purchase = await fetchSubscriptionPurchase({
       packageName,
-      productId,
       purchaseToken,
     });
     const planTier = resolvePlanTierFromGooglePurchase(purchase);
@@ -266,7 +258,7 @@ Deno.serve(async (req) => {
       ok: true,
       appUserId: authData.user.id,
       planTier,
-      purchaseState: purchase?.purchaseStateContext?.purchaseState || null,
+      subscriptionState: purchase?.subscriptionState || null,
       acknowledgementState: purchase?.acknowledgementState || null,
     });
   } catch (error) {

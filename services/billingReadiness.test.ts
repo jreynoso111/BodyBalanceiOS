@@ -2,11 +2,13 @@ describe('billing readiness', () => {
   afterEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    delete process.env.EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID;
+    delete process.env.EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID;
     delete process.env.EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID;
   });
 
   it('returns not ready when backend health probe fails', async () => {
-    process.env.EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID = 'premium_access';
+    process.env.EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID = 'premium_annual';
 
     jest.doMock('react-native', () => ({
       Platform: { OS: 'android' },
@@ -55,7 +57,7 @@ describe('billing readiness', () => {
   });
 
   it('returns ready when local config, store connection, and backend probe all pass', async () => {
-    process.env.EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID = 'premium_access';
+    process.env.EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID = 'premium_annual';
 
     jest.doMock('react-native', () => ({
       Platform: { OS: 'android' },

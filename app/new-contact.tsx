@@ -5,11 +5,10 @@ import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { X, Check, Trash2 } from 'lucide-react-native';
-import { countLinkedFriends, PLAN_LIMITS } from '@/services/subscriptionPlan';
 import { AppLegalFooter } from '@/components/AppLegalFooter';
 
 export default function NewContactScreen() {
-    const { user, planTier } = useAuthStore();
+    const { user } = useAuthStore();
     const router = useRouter();
     const headerHeight = useHeaderHeight();
     const { id, mode } = useLocalSearchParams();
@@ -273,29 +272,6 @@ export default function NewContactScreen() {
         }
 
         if (targetUserId) {
-            const isNewLinkedFriend = existingTargetUserId !== targetUserId;
-            if (planTier === 'free' && isNewLinkedFriend) {
-                const { count, error: countError } = await countLinkedFriends(user.id);
-                if (countError) {
-                    Alert.alert('Error', countError.message);
-                    setLoading(false);
-                    return;
-                }
-
-                if (count >= PLAN_LIMITS.free.linkedFriends) {
-                    Alert.alert(
-                        'Free plan limit reached',
-                        `Free accounts can link up to ${PLAN_LIMITS.free.linkedFriends} friends. Upgrade to Premium to unlock unlimited linked friends.`,
-                        [
-                            { text: 'Not now', style: 'cancel' },
-                            { text: 'View plans', onPress: () => router.push('/subscription' as any) },
-                        ]
-                    );
-                    setLoading(false);
-                    return;
-                }
-            }
-
             const { data: targetDuplicates } = await supabase
                 .from('contacts')
                 .select('id')

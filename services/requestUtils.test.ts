@@ -54,10 +54,10 @@ describe('requestUtils', () => {
     const losingMessage = buildMergeChoiceConfirmationMessage(mergeRequest, 'user-a', 'Ana', 'user-b');
     expect(losingMessage.title).toBe("Keep Ana's history?");
     expect(losingMessage.message).toContain("Ben user's separate data will be deleted.");
-    expect(losingMessage.message).toContain('CSV export requires Premium.');
+    expect(losingMessage.message).toContain('CSV export is available during the free trial or with Premium.');
 
     const safeMessage = buildMergeChoiceConfirmationMessage(mergeRequest, 'user-a', 'Ana', 'user-a');
-    expect(safeMessage.message).not.toContain('CSV export requires Premium.');
+    expect(safeMessage.message).not.toContain('CSV export is available during the free trial or with Premium.');
   });
 
   it('returns merge cancel copy and display names', () => {

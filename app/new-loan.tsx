@@ -10,7 +10,6 @@ import { decode } from 'base64-arraybuffer';
 import { scheduleLoanReminderForUser } from '@/services/notificationService';
 import { CURRENCIES, getCurrencySymbol } from '@/constants/Currencies';
 import { getOrCreateUserPreferences, sanitizePreferredCurrencies, updateUserPreferences } from '@/services/userPreferences';
-import { countActiveRecords, PLAN_LIMITS } from '@/services/subscriptionPlan';
 
 const REMINDER_OPTIONS = [
   { label: 'Off', value: 'none' },
@@ -69,7 +68,7 @@ const TRANSACTION_PRESETS = [
 type ReminderFrequency = 'none' | 'daily' | 'weekly' | 'custom' | 'monthly' | 'yearly';
 
 export default function NewLoanScreen() {
-  const { user, planTier } = useAuthStore();
+  const { user } = useAuthStore();
   const router = useRouter();
   const { contactId: initialContactIdParam } = useLocalSearchParams<{ contactId?: string | string[] }>();
   const initialContactId = Array.isArray(initialContactIdParam) ? initialContactIdParam[0] : initialContactIdParam;
@@ -230,25 +229,6 @@ export default function NewLoanScreen() {
 
     setLoading(true);
     try {
-      if (planTier === 'free' && user?.id) {
-        const { count, error: countError } = await countActiveRecords(user.id);
-        if (countError) {
-          throw countError;
-        }
-
-        if (count >= PLAN_LIMITS.free.activeRecords) {
-          Alert.alert(
-            'Free plan limit reached',
-            `Free accounts can keep up to ${PLAN_LIMITS.free.activeRecords} active records. Upgrade to Premium to unlock unlimited records.`,
-            [
-              { text: 'Not now', style: 'cancel' },
-              { text: 'View plans', onPress: () => router.push('/subscription' as any) },
-            ]
-          );
-          return;
-        }
-      }
-
       let evidenceUrl: string | null = null;
 
       if (image && base64StringRef.current) {

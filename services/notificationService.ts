@@ -134,7 +134,7 @@ export async function getPushPermissionStatus() {
     if (isAndroidExpoGo) return 'unavailable' as const;
     const Notifications = await getNotificationsModule();
     if (!Notifications) return 'unavailable' as const;
-    const { status } = await Notifications.getPermissionsAsync();
+    const { status } = (await Notifications.getPermissionsAsync()) as { status: 'granted' | 'denied' | 'undetermined' };
     return status;
 }
 
@@ -167,11 +167,15 @@ export async function registerForPushNotificationsAsync(options?: {
 
     await ensureAndroidNotificationChannel();
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } = (await Notifications.getPermissionsAsync()) as {
+        status: 'granted' | 'denied' | 'undetermined';
+    };
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted' && requestPermission) {
-        const permissionResult = await Notifications.requestPermissionsAsync();
+        const permissionResult = (await Notifications.requestPermissionsAsync()) as {
+            status: 'granted' | 'denied' | 'undetermined';
+        };
         finalStatus = permissionResult.status;
     }
 

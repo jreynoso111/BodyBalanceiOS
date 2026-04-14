@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import type { ProductOrSubscription, Purchase } from 'expo-iap';
+import type { ActiveSubscription, ProductOrSubscription, Purchase } from 'expo-iap';
 import { Platform } from 'react-native';
 
 import { supabase } from '@/services/supabase';
@@ -38,9 +38,15 @@ type SyncPurchaseParams = {
   purchaseToken: string;
 };
 
-const ANDROID_PREMIUM_PRODUCT_ID = String(process.env.EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID || '').trim();
+const ANDROID_ANNUAL_PRODUCT_ID = String(
+  process.env.EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID || process.env.EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID || ''
+).trim();
+const ANDROID_MONTHLY_PRODUCT_ID = String(process.env.EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID || '').trim();
 const ANDROID_PACKAGE_NAME =
   String(Constants.expoConfig?.android?.package || Constants.manifest2?.extra?.expoClient?.android?.package || '').trim();
+const ANDROID_PREMIUM_PRODUCT_IDS = Array.from(
+  new Set([ANDROID_ANNUAL_PRODUCT_ID, ANDROID_MONTHLY_PRODUCT_ID].filter(Boolean))
+);
 
 let billingConfiguredUser: BillingUser = {};
 let billingConnectionReady = false;
@@ -60,7 +66,7 @@ async function getExpoIapModule() {
 }
 
 function hasAndroidBillingConfig() {
-  return Boolean(ANDROID_PREMIUM_PRODUCT_ID && ANDROID_PACKAGE_NAME);
+  return Boolean(ANDROID_PREMIUM_PRODUCT_IDS.length > 0 && ANDROID_PACKAGE_NAME);
 }
 
 async function ensureBillingConnection() {
@@ -92,8 +98,8 @@ async function ensureBillingConnection() {
 }
 
 function getMissingAndroidBillingConfigReason() {
-  if (!ANDROID_PREMIUM_PRODUCT_ID) {
-    return 'Google Play billing is missing EXPO_PUBLIC_ANDROID_PREMIUM_PRODUCT_ID.';
+  if (ANDROID_PREMIUM_PRODUCT_IDS.length === 0) {
+    return 'Google Play billing is missing EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID or EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID.';
   }
 
   if (!ANDROID_PACKAGE_NAME) {
@@ -107,11 +113,31 @@ function getSignedInUserId() {
   return String(billingConfiguredUser.userId || '').trim();
 }
 
+function getPrimaryPremiumProductId() {
+  return ANDROID_ANNUAL_PRODUCT_ID || ANDROID_MONTHLY_PRODUCT_ID || '';
+}
+
+function getConfiguredPremiumProductIds() {
+  return ANDROID_PREMIUM_PRODUCT_IDS;
+}
+
+function isConfiguredPremiumProductId(productId: string) {
+  return getConfiguredPremiumProductIds().includes(productId);
+}
+
 function getMatchingPremiumPurchase(purchases: Purchase[]) {
   return purchases.find(
     (purchase) =>
-      purchase.productId === ANDROID_PREMIUM_PRODUCT_ID &&
-      (purchase.purchaseState === 'purchased' || purchase.isAutoRenewing)
+      isConfiguredPremiumProductId(String(purchase.productId || '').trim()) &&
+      (purchase.purchaseState === 'purchased' || purchase.isAutoRenewing || Boolean(purchase.purchaseToken))
+  );
+}
+
+function getMatchingPremiumSubscription(purchases: ActiveSubscription[]) {
+  return purchases.find(
+    (purchase) =>
+      isConfiguredPremiumProductId(String(purchase.productId || '').trim()) &&
+      (purchase.isActive || Boolean(purchase.autoRenewingAndroid) || Boolean(purchase.purchaseToken))
   );
 }
 
@@ -120,16 +146,63 @@ function isPurchaseCancelled(error: unknown) {
   return code === 'user-cancelled' || code === 'e_user_cancelled';
 }
 
-async function fetchPremiumProduct() {
+function sortPremiumProducts(products: ProductOrSubscription[]) {
+  const priority = new Map(
+    getConfiguredPremiumProductIds().map((productId, index) => [productId, index])
+  );
+
+  return [...products].sort((left, right) => {
+    const leftPriority = priority.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+    const rightPriority = priority.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+    return leftPriority - rightPriority;
+  });
+}
+
+function inferBillingPeriodLabel(productId: string) {
+  const normalizedId = productId.toLowerCase();
+  if (normalizedId.includes('month')) {
+    return 'monthly';
+  }
+
+  if (normalizedId.includes('year') || normalizedId.includes('annual')) {
+    return 'annual';
+  }
+
+  return 'Premium';
+}
+
+async function fetchPremiumProducts() {
   await ensureBillingConnection();
   const { fetchProducts } = await getExpoIapModule();
 
   const products = (await fetchProducts({
-    skus: [ANDROID_PREMIUM_PRODUCT_ID],
-    type: 'in-app',
+    skus: getConfiguredPremiumProductIds(),
+    type: 'subs',
   })) ?? [];
 
-  return products.find((product) => product.id === ANDROID_PREMIUM_PRODUCT_ID && product.type === 'in-app') || null;
+  return sortPremiumProducts(products.filter((product) => product.type === 'subs'));
+}
+
+async function fetchPremiumProduct(productId?: string) {
+  const products = await fetchPremiumProducts();
+  if (productId) {
+    return products.find((product) => product.id === productId) || null;
+  }
+
+  return products[0] || null;
+}
+
+function getSubscriptionOfferToken(product: ProductOrSubscription | null) {
+  if (!product || product.type !== 'subs' || product.platform !== 'android') {
+    return null;
+  }
+
+  const standardizedOfferToken = product.subscriptionOffers?.find((offer) => offer.offerTokenAndroid)?.offerTokenAndroid;
+  if (standardizedOfferToken) {
+    return standardizedOfferToken;
+  }
+
+  return product.subscriptionOfferDetailsAndroid?.[0]?.offerToken || null;
 }
 
 function updateLocalPlanTier(planTier: PlanTier) {
@@ -154,7 +227,7 @@ async function syncGooglePlayPurchase({ productId, purchaseToken }: SyncPurchase
       package_name: ANDROID_PACKAGE_NAME,
       product_id: productId,
       purchase_token: purchaseToken,
-      is_subscription: false,
+      is_subscription: true,
     },
   });
 
@@ -179,8 +252,8 @@ async function fetchGooglePlayBillingHealth(): Promise<BillingReadinessResult> {
     body: {
       mode: 'health',
       package_name: ANDROID_PACKAGE_NAME,
-      product_id: ANDROID_PREMIUM_PRODUCT_ID,
-      is_subscription: false,
+      product_id: getPrimaryPremiumProductId(),
+      is_subscription: true,
     },
   });
 
@@ -224,7 +297,11 @@ export function getBillingUnavailableReason() {
 }
 
 export function getBillingEntitlementId() {
-  return ANDROID_PREMIUM_PRODUCT_ID || 'premium';
+  return getPrimaryPremiumProductId() || 'premium';
+}
+
+export function getBillingEntitlementIds() {
+  return getConfiguredPremiumProductIds();
 }
 
 export async function getBillingReadiness(): Promise<BillingReadinessResult> {
@@ -299,12 +376,13 @@ export async function fetchPremiumOffering(): Promise<PremiumOffering> {
     };
   }
 
-  const featuredPackage = await fetchPremiumProduct();
+  const products = await fetchPremiumProducts();
+  const featuredPackage = products[0] || null;
   return {
     offering: featuredPackage
       ? {
           id: 'android-google-play',
-          products: [featuredPackage],
+          products,
         }
       : null,
     featuredPackage,
@@ -313,10 +391,10 @@ export async function fetchPremiumOffering(): Promise<PremiumOffering> {
 
 export function describePackage(product?: ProductOrSubscription | null) {
   if (product?.displayPrice) {
-    return `Google Play lifetime access for ${product.displayPrice}`;
+    return `Google Play ${inferBillingPeriodLabel(product.id)} subscription for ${product.displayPrice}`;
   }
 
-  return 'Google Play lifetime access';
+  return `Google Play ${product ? inferBillingPeriodLabel(product.id) : 'Premium'} subscription`;
 }
 
 export async function syncPlanTierFromBillingServer(params?: Partial<SyncPurchaseParams>): Promise<BillingSyncResult> {
@@ -329,7 +407,7 @@ export async function syncPlanTierFromBillingServer(params?: Partial<SyncPurchas
   }
 
   const purchaseToken = String(params?.purchaseToken || '').trim();
-  const productId = String(params?.productId || ANDROID_PREMIUM_PRODUCT_ID).trim();
+  const productId = String(params?.productId || getPrimaryPremiumProductId()).trim();
 
   if (!purchaseToken || !productId) {
     return {
@@ -346,7 +424,7 @@ export async function syncPlanTierFromBillingServer(params?: Partial<SyncPurchas
   return result;
 }
 
-export async function purchasePremiumPackage() {
+export async function purchasePremiumPackage(productId?: string) {
   if (!isBillingAvailable()) {
     throw new Error(getBillingUnavailableReason() || 'Billing is unavailable on this device.');
   }
@@ -356,18 +434,21 @@ export async function purchasePremiumPackage() {
     throw new Error('Sign in before starting a Google Play purchase.');
   }
 
-  const product = await fetchPremiumProduct();
+  const targetProductId = String(productId || getPrimaryPremiumProductId()).trim();
+  const product = await fetchPremiumProduct(targetProductId);
   if (!product) {
-    throw new Error(`Google Play product "${ANDROID_PREMIUM_PRODUCT_ID}" was not returned by Billing.`);
+    throw new Error(`Google Play product "${targetProductId}" was not returned by Billing.`);
   }
 
   try {
     const { requestPurchase, finishTransaction } = await getExpoIapModule();
+    const offerToken = getSubscriptionOfferToken(product);
     const purchaseResult = await requestPurchase({
-      type: 'in-app',
+      type: 'subs',
       request: {
         google: {
           skus: [product.id],
+          ...(offerToken ? { subscriptionOffers: [{ sku: product.id, offerToken }] } : {}),
           obfuscatedAccountId: userId,
           obfuscatedProfileId: userId,
         },
@@ -378,7 +459,7 @@ export async function purchasePremiumPackage() {
     const purchase = getMatchingPremiumPurchase(purchases);
 
     if (!purchase) {
-      throw new Error('Google Play did not return a completed Premium purchase.');
+      throw new Error('Google Play did not return a completed Premium subscription.');
     }
 
     if (!purchase.purchaseToken) {
@@ -386,7 +467,7 @@ export async function purchasePremiumPackage() {
     }
 
     if (purchase.purchaseState !== 'purchased') {
-      throw new Error('Your Google Play purchase is still pending approval.');
+      throw new Error('Your Google Play subscription is still pending approval.');
     }
 
     const syncResult = await syncGooglePlayPurchase({
@@ -395,7 +476,7 @@ export async function purchasePremiumPackage() {
     });
 
     if (!syncResult.synced || syncResult.planTier !== 'premium') {
-      throw new Error(syncResult.error || 'The purchase was completed, but Premium could not be activated yet.');
+      throw new Error(syncResult.error || 'The subscription was completed, but Premium could not be activated yet.');
     }
 
     await finishTransaction({
@@ -420,21 +501,18 @@ export async function restorePremiumAccess() {
   }
 
   try {
-    const { finishTransaction, getAvailablePurchases, restorePurchases } = await getExpoIapModule();
+    const { getActiveSubscriptions, restorePurchases } = await getExpoIapModule();
     await ensureBillingConnection();
     await restorePurchases();
 
-    const purchases = await getAvailablePurchases({
-      alsoPublishToEventListenerIOS: false,
-      onlyIncludeActiveItemsIOS: true,
-    });
-    const premiumPurchase = getMatchingPremiumPurchase(purchases);
+    const purchases = await getActiveSubscriptions(getConfiguredPremiumProductIds());
+    const premiumPurchase = getMatchingPremiumSubscription(purchases);
 
     if (!premiumPurchase?.purchaseToken) {
       return {
         planTier: 'free' as PlanTier,
         synced: false,
-        error: 'No Google Play Premium purchase was found to restore.',
+        error: 'No Google Play Premium subscription was found to restore.',
       };
     }
 
@@ -445,13 +523,6 @@ export async function restorePremiumAccess() {
 
     if (!syncResult.synced || syncResult.planTier !== 'premium') {
       return syncResult;
-    }
-
-    if ((premiumPurchase as any).isAcknowledgedAndroid !== true) {
-      await finishTransaction({
-        purchase: premiumPurchase,
-        isConsumable: false,
-      });
     }
 
     updateLocalPlanTier('premium');
@@ -470,12 +541,9 @@ export async function getLocalBillingPlanTier() {
     return 'free' as PlanTier;
   }
 
-  const { getAvailablePurchases } = await getExpoIapModule();
+  const { getActiveSubscriptions } = await getExpoIapModule();
   await ensureBillingConnection();
-  const purchases = await getAvailablePurchases({
-    alsoPublishToEventListenerIOS: false,
-    onlyIncludeActiveItemsIOS: true,
-  });
+  const purchases = await getActiveSubscriptions(getConfiguredPremiumProductIds());
 
-  return getMatchingPremiumPurchase(purchases) ? ('premium' as PlanTier) : ('free' as PlanTier);
+  return getMatchingPremiumSubscription(purchases) ? ('premium' as PlanTier) : ('free' as PlanTier);
 }

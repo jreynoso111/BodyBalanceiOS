@@ -80,7 +80,7 @@ export function buildMergeChoiceConfirmationMessage(request: any, keepUserId: st
   ];
 
   if (currentUserLosesData) {
-    messageParts.push('If you need a backup, download your CSV from Settings first. CSV export requires Premium.');
+    messageParts.push('If you need a backup, download your CSV from Settings first. CSV export is available during the free trial or with Premium.');
   }
 
   return {

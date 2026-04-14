@@ -2,6 +2,9 @@ import { supabase } from '@/services/supabase';
 import { hasReferralPremiumAccessAt, normalizePlanTierValue, type PlanTier } from '@/services/subscriptionPlanUtils';
 
 export type { PlanTier } from '@/services/subscriptionPlanUtils';
+export type MembershipStatus = 'free' | 'trial' | 'premium';
+export const PREMIUM_TRIAL_DAYS = 21;
+const PREMIUM_TRIAL_MS = PREMIUM_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 
 export const PLAN_LIMITS = {
   free: {
@@ -22,8 +25,41 @@ export function normalizePlanTier(value?: string | null, premiumReferralExpiresA
   return normalizePlanTierValue(value, premiumReferralExpiresAt);
 }
 
-export function getPlanLabel(plan: PlanTier) {
-  return plan === 'premium' ? 'Premium' : 'Free';
+export function getPremiumTrialEndsAt(trialStartedAt?: string | null) {
+  if (!trialStartedAt) return null;
+  const startsAt = new Date(trialStartedAt);
+  if (Number.isNaN(startsAt.getTime())) return null;
+  return new Date(startsAt.getTime() + PREMIUM_TRIAL_MS);
+}
+
+export function hasPremiumTrialAccess(trialStartedAt?: string | null, now = Date.now()) {
+  const endsAt = getPremiumTrialEndsAt(trialStartedAt);
+  if (!endsAt) return false;
+  return endsAt.getTime() > now;
+}
+
+export function getPremiumTrialDaysRemaining(trialStartedAt?: string | null, now = Date.now()) {
+  const endsAt = getPremiumTrialEndsAt(trialStartedAt);
+  if (!endsAt) return 0;
+  const remainingMs = endsAt.getTime() - now;
+  if (remainingMs <= 0) return 0;
+  return Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+}
+
+export function getMembershipStatus(plan: PlanTier, options?: { trialStartedAt?: string | null }): MembershipStatus {
+  if (plan === 'premium') return 'premium';
+  return hasPremiumTrialAccess(options?.trialStartedAt) ? 'trial' : 'free';
+}
+
+export function hasPremiumAccess(plan: PlanTier, options?: { trialStartedAt?: string | null }) {
+  return getMembershipStatus(plan, options) !== 'free';
+}
+
+export function getPlanLabel(plan: PlanTier, options?: { trialStartedAt?: string | null }) {
+  const status = getMembershipStatus(plan, options);
+  if (status === 'premium') return 'Premium';
+  if (status === 'trial') return 'Trial';
+  return 'Free';
 }
 
 export async function fetchPlanTier(userId: string): Promise<{

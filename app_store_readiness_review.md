@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The app is not ready for App Store submission yet. The biggest blockers are unfinished in-app purchase integration, manual Premium entitlement paths that weaken monetization control, and an unauthenticated support email function that can be abused. There is also at least one export-related client-side security issue and SDK package drift that should be corrected before release builds.
+The app is not ready for App Store submission yet. The biggest blockers are unfinished in-app purchase integration and manual Premium entitlement paths that weaken monetization control. Earlier findings around the public support endpoint and CSV export handling have been addressed in the current code, but should remain on the release verification checklist. Expo SDK package drift should also be corrected before release builds.
 
 ## Critical
 
@@ -28,22 +28,27 @@ The app is not ready for App Store submission yet. The biggest blockers are unfi
 
 ## High
 
-### 3. Public contact function is an unauthenticated email relay with no rate limiting
+### 3. Public contact function hardening
 - File:
   - `supabase/functions/public-contact/index.ts`
-- Impact: attackers can automate spam and abuse your outbound email reputation, potentially causing support email delivery failures or provider suspension.
-- Evidence:
-  - Wildcard CORS is enabled.
-  - The endpoint is public.
-  - There is no CAPTCHA, origin allowlist, rate limiting, or abuse throttling.
-  - A honeypot field alone is not enough for production abuse resistance.
+- Status: addressed in the current implementation.
+- Current protections:
+  - Per-origin CORS handling with an allowlist instead of wildcard access.
+  - Cloudflare Turnstile verification for non-local traffic.
+  - IP and email-based rate limiting via `bump_public_contact_rate_limit`.
+  - Honeypot field plus input length and format validation.
+- Residual release check:
+  - Confirm the production secrets and rate-limit RPC are deployed and working.
 
-### 4. CSV export is vulnerable to formula injection
+### 4. CSV export formula injection
 - File:
   - `services/exportService.ts`
-- Impact: if a contact name or description starts with spreadsheet formula characters such as `=`, `+`, `-`, or `@`, opening the exported CSV in Excel/Sheets can execute attacker-controlled formulas.
-- Evidence:
-  - Export rows interpolate user-controlled `contacts.name` and `loan.description` directly into CSV output without formula neutralization.
+- Status: addressed in the current implementation.
+- Current protections:
+  - `services/csv.ts` neutralizes formula-like prefixes before escaping CSV cells.
+  - `services/exportService.ts` uses `escapeCsvCell(...)` for exported user-controlled fields.
+- Residual release check:
+  - Keep regression tests for formula-like values and manually verify one export in Excel/Sheets during release QA.
 
 ## Medium
 
@@ -66,7 +71,7 @@ The app is not ready for App Store submission yet. The biggest blockers are unfi
 
 1. Finish real App Store / Play billing integration and remove placeholder messaging.
 2. Lock Premium entitlement changes behind verified purchase or tightly scoped support tooling.
-3. Add abuse controls to the public support email function.
-4. Sanitize CSV exports against formula injection.
-5. Align Expo dependency versions with the installed SDK.
+3. Align Expo dependency versions with the installed SDK.
+4. Re-verify public contact abuse protections in production.
+5. Re-verify CSV export neutralization in release QA.
 6. Add at least smoke-test coverage for auth, billing, referrals, and profile/security flows.

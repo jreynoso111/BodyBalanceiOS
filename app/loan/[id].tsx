@@ -11,6 +11,7 @@ import { CURRENCIES, getCurrencySymbol } from '@/constants/Currencies';
 import { getOrCreateUserPreferences, sanitizePreferredCurrencies, updateUserPreferences } from '@/services/userPreferences';
 import { cancelLoanReminders, upsertLoanReminderForUser } from '@/services/notificationService';
 import { shareLoanAsPdf } from '@/services/exportService';
+import { hasPremiumAccess } from '@/services/subscriptionPlan';
 
 const isMissingRequestPayloadColumn = (message?: string) =>
     String(message || '').toLowerCase().includes('request_payload');
@@ -591,8 +592,8 @@ export default function LoanDetailScreen() {
     };
 
     const handleSharePdf = async () => {
-        if (planTier !== 'premium') {
-            Alert.alert('Premium feature', 'PDF sharing is available only for Premium accounts.');
+        if (!hasPremiumAccess(planTier, { trialStartedAt: user?.created_at })) {
+            Alert.alert('Membership required', 'PDF sharing is available during the 21-day free trial or with Premium.');
             return;
         }
 
@@ -696,7 +697,7 @@ export default function LoanDetailScreen() {
                     ),
                     headerRight: () => (
                         <RNView style={styles.headerActions}>
-                            {planTier === 'premium' ? (
+                            {hasPremiumAccess(planTier, { trialStartedAt: user?.created_at }) ? (
                                 <TouchableOpacity onPress={() => void handleSharePdf()} style={styles.shareHeader} disabled={sharingPdf}>
                                     {sharingPdf ? <ActivityIndicator size="small" color="#4F46E5" /> : <Share2 size={20} color="#4F46E5" />}
                                 </TouchableOpacity>

@@ -23,15 +23,25 @@
       },
       "bundleIdentifier": "com.jreynoso.buddybalance"
     },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "versionCode": 6
+    },
     "plugins": [
       "expo-router",
       "expo-notifications",
       "expo-iap",
+      "expo-secure-store",
       "expo-sharing",
       [
         "expo-image-picker",
         {
           "photosPermission": "Allow Buddy Balance to access your photos so you can choose a profile picture or attach an image to a record.",
+          "cameraPermission": false,
           "microphonePermission": false
         }
       ],
@@ -44,6 +54,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "appEnv": "development",
+      "googleOAuthEnabled": false,
+      "router": {},
+      "eas": {
+        "projectId": "860ee5d5-f2ab-4efa-9476-30e8171a4113"
+      }
     }
   }
 }

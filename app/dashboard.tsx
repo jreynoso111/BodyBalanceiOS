@@ -36,7 +36,7 @@ export default function AccountDashboardScreen() {
         <Card style={styles.panel}>
           <Text style={styles.panelTitle}>Account status</Text>
           <Text style={styles.panelBody}>
-            Plan: {getPlanLabel(planTier)}
+            Plan: {getPlanLabel(planTier, { trialStartedAt: user?.created_at })}
           </Text>
           <Text style={styles.panelBody}>
             Role: {isAdmin ? 'Administrator' : 'Standard user'}

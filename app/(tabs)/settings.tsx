@@ -10,7 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { DEFAULT_USER_PREFERENCES, getOrCreateUserPreferences } from '@/services/userPreferences';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfileAvatarPublicUrl, isMissingAvatarUrlColumn } from '@/services/profileAvatar';
-import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
+import { getMembershipStatus, getPlanLabel, hasPremiumAccess, normalizePlanTier } from '@/services/subscriptionPlan';
 import { getDeviceLanguage } from '@/constants/i18n';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
@@ -112,8 +112,8 @@ export default function SettingsScreen() {
     };
 
     const handleExport = async () => {
-        if (planTier !== 'premium') {
-            Alert.alert('Premium feature', 'Export Data (CSV) is available only for Premium accounts.');
+        if (!hasPremiumAccess(planTier, { trialStartedAt: user?.created_at })) {
+            Alert.alert('Membership required', 'CSV export is available during the 21-day free trial or with Premium.');
             return;
         }
 
@@ -132,11 +132,14 @@ export default function SettingsScreen() {
         }
     };
 
+    const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
+    const hasPaidOrTrialAccess = membershipStatus !== 'free';
+
     const menuItems = [
         {
             icon: Sparkles,
-            label: planTier === 'premium' ? 'Manage Premium' : 'Upgrade to Premium',
-            sub: planTier === 'premium' ? 'Unlimited friends and records' : 'Unlock unlimited friends and records',
+            label: membershipStatus === 'premium' ? 'Manage Premium' : membershipStatus === 'trial' ? 'Manage Trial' : 'Start Premium',
+            sub: membershipStatus === 'premium' ? 'Annual membership active' : membershipStatus === 'trial' ? '21-day free trial active' : 'Your 21-day free trial has ended',
             onPress: () => router.push('/subscription' as any),
         },
         { icon: User, label: 'Profile', sub: user?.email, onPress: () => router.push('/profile') },
@@ -146,11 +149,11 @@ export default function SettingsScreen() {
         { icon: Trash2, label: 'Delete Account', sub: 'Permanent account removal', onPress: () => router.push('/delete-account') },
     ];
 
-    if (planTier === 'premium') {
+    if (hasPaidOrTrialAccess) {
         menuItems.splice(4, 0, {
             icon: FileOutput,
             label: 'Export Data (CSV)',
-            sub: 'Share report',
+            sub: membershipStatus === 'trial' ? 'Included during trial' : 'Share report',
             onPress: handleExport,
         });
     }
@@ -190,7 +193,7 @@ export default function SettingsScreen() {
                             <RNView style={styles.webSummaryCopy}>
                                 <Text style={styles.webSummaryName}>{profileName || 'Buddy Balance account'}</Text>
                                 <Text style={styles.webSummaryEmail}>{user?.email}</Text>
-                                <Text style={styles.webSummaryMeta}>{getPlanLabel(planTier)} plan{hasAdminAccess ? ' • Admin access' : ''}</Text>
+                                <Text style={styles.webSummaryMeta}>{getPlanLabel(planTier, { trialStartedAt: user?.created_at })} plan{hasAdminAccess ? ' • Admin access' : ''}</Text>
                             </RNView>
                         </RNView>
                         <Text style={styles.webSummaryText}>
@@ -214,7 +217,7 @@ export default function SettingsScreen() {
                 <View style={styles.webGrid}>
                     <Card style={styles.webStatusCard}>
                         <Text style={styles.webCardTitle}>Current status</Text>
-                        <Text style={styles.webStatusLine}>Plan: {getPlanLabel(planTier)}</Text>
+                        <Text style={styles.webStatusLine}>Plan: {getPlanLabel(planTier, { trialStartedAt: user?.created_at })}</Text>
                         <Text style={styles.webStatusLine}>Push alerts: {prefs.push_enabled ? 'Enabled' : 'Disabled'}</Text>
                         <Text style={styles.webStatusLine}>Biometric lock: {prefs.biometric_enabled ? 'Enabled' : 'Disabled'}</Text>
                         <Text style={styles.webStatusLine}>Marketing updates: {prefs.marketing_enabled ? 'Enabled' : 'Disabled'}</Text>
@@ -222,9 +225,9 @@ export default function SettingsScreen() {
 
                     <Card style={styles.webStatusCard}>
                         <Text style={styles.webCardTitle}>Quick actions</Text>
-                        {planTier === 'premium' ? (
+                        {hasPaidOrTrialAccess ? (
                             <TouchableOpacity style={styles.webPrimaryButton} onPress={handleExport}>
-                                <Text style={styles.webPrimaryButtonText}>Export CSV</Text>
+                                <Text style={styles.webPrimaryButtonText}>{membershipStatus === 'trial' ? 'Export CSV (trial)' : 'Export CSV'}</Text>
                             </TouchableOpacity>
                         ) : (
                             <Link href="/subscription" asChild>
@@ -263,7 +266,7 @@ export default function SettingsScreen() {
                     </RNView>
                     {profileName ? <Text style={styles.profileName}>{profileName}</Text> : null}
                     <Text style={styles.profileEmail}>{user?.email}</Text>
-                    <Text style={styles.profileSub}>{getPlanLabel(planTier)} Plan • {hasAdminAccess ? 'Admin' : 'User'}</Text>
+                    <Text style={styles.profileSub}>{getPlanLabel(planTier, { trialStartedAt: user?.created_at })} Plan • {hasAdminAccess ? 'Admin' : 'User'}</Text>
                 </View>
 
                 <Card style={styles.menuCard}>
