@@ -10,6 +10,7 @@ import { decode } from 'base64-arraybuffer';
 import { scheduleLoanReminderForUser } from '@/services/notificationService';
 import { CURRENCIES, getCurrencySymbol } from '@/constants/Currencies';
 import { getOrCreateUserPreferences, sanitizePreferredCurrencies, updateUserPreferences } from '@/services/userPreferences';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const REMINDER_OPTIONS = [
   { label: 'Off', value: 'none' },
@@ -154,13 +155,6 @@ export default function NewLoanScreen() {
       .is('deleted_at', null);
 
     const newContacts = [...(data || [])].sort((left, right) => left.name.localeCompare(right.name));
-
-    if (newContacts.length > contacts.length) {
-      const addedContact = newContacts.find((nc) => !contacts.some((oc) => oc.id === nc.id));
-      if (addedContact || (contacts.length === 0 && newContacts.length === 1)) {
-        setContactId(addedContact ? addedContact.id : newContacts[0].id);
-      }
-    }
 
     setContacts(newContacts);
 
@@ -371,6 +365,30 @@ export default function NewLoanScreen() {
     return contact.name.toLowerCase().includes(normalizedContactSearch);
   });
   const dueLabel = dueDate ? formatDueLabel(dueDate) : 'No due date selected';
+  const heroGradient: [string, string, string] =
+    selectedPreset.key === 'lent-money'
+      ? ['#F8FAFC', '#ECFDF5', '#D1FAE5']
+      : selectedPreset.key === 'borrowed-money'
+        ? ['#FFF7F7', '#FEE2E2', '#FDE2E8']
+        : selectedPreset.key === 'lent-item'
+          ? ['#F8FAFC', '#F1F5F9', '#E2E8F0']
+          : ['#F5F3FF', '#EEF2FF', '#E0E7FF'];
+  const categoryLabel = category === 'money' ? 'Money record' : 'Item record';
+  const directionLabel = type === 'lent' ? 'You are giving' : 'You are receiving';
+  const contactStatusLabel = selectedContact
+    ? selectedContactIsLinked
+      ? 'Shared contact'
+      : selectedContactIsPending
+        ? 'Invite pending'
+        : 'Private contact'
+    : 'No contact selected';
+  const heroPrimaryValue = category === 'money'
+    ? amount
+      ? `${getCurrencySymbol(currency)}${amount}`
+      : `${getCurrencySymbol(currency)}0.00`
+    : itemName || 'Unnamed item';
+  const heroSecondaryValue = selectedContact?.name || 'Choose a contact';
+  const summaryTone = type === 'lent' ? styles.summaryAccentPositive : styles.summaryAccentNegative;
 
   return (
     <Screen style={styles.container}>
@@ -399,12 +417,47 @@ export default function NewLoanScreen() {
           keyboardDismissMode="on-drag"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void handleRefresh()} />}
         >
-          <Card style={styles.heroCard}>
-            <Text style={styles.eyebrow}>Quick record</Text>
-            <Text style={styles.heroTitle}>What happened?</Text>
-            <Text style={styles.heroText}>Choose one to start. The form below adapts automatically.</Text>
-          </Card>
+          <LinearGradient colors={heroGradient} style={styles.heroCard}>
+            <RNView style={styles.heroTopRow}>
+              <RNView style={styles.heroBadge}>
+                <Text style={styles.heroBadgeText}>New transaction</Text>
+              </RNView>
+              <RNView style={styles.heroStatusPill}>
+                <Text style={styles.heroStatusText}>{categoryLabel}</Text>
+              </RNView>
+            </RNView>
 
+            <Text style={styles.heroTitle}>{selectedPreset.title}</Text>
+            <Text style={styles.heroText}>{selectedPreset.subtitle}</Text>
+
+            <RNView style={styles.heroStatsRow}>
+              <RNView style={styles.heroStatCard}>
+                <Text style={styles.heroStatLabel}>{category === 'money' ? 'Amount' : 'Item'}</Text>
+                <Text style={styles.heroStatValue}>{heroPrimaryValue}</Text>
+              </RNView>
+              <RNView style={styles.heroStatCard}>
+                <Text style={styles.heroStatLabel}>Contact</Text>
+                <Text style={styles.heroStatValue} numberOfLines={1}>{heroSecondaryValue}</Text>
+              </RNView>
+            </RNView>
+
+            <RNView style={styles.heroMetaRow}>
+              <RNView style={styles.heroMetaChip}>
+                <Text style={styles.heroMetaChipText}>{directionLabel}</Text>
+              </RNView>
+              <RNView style={styles.heroMetaChip}>
+                <Text style={styles.heroMetaChipText}>{dueLabel}</Text>
+              </RNView>
+              <RNView style={styles.heroMetaChip}>
+                <Text style={styles.heroMetaChipText}>{contactStatusLabel}</Text>
+              </RNView>
+            </RNView>
+          </LinearGradient>
+
+          <RNView style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionKicker}>Record style</Text>
+            <Text style={styles.sectionHint}>Pick the direction first. Everything below adapts to it.</Text>
+          </RNView>
           <View style={styles.presetGrid}>
             {TRANSACTION_PRESETS.map((preset) => {
               const Icon = preset.icon;
@@ -412,7 +465,7 @@ export default function NewLoanScreen() {
               return (
                 <TouchableOpacity
                   key={preset.key}
-                  style={[styles.presetCard, active && styles.presetCardActive]}
+                  style={[styles.presetCard, active && styles.presetCardActive, active && { borderColor: preset.accent }]}
                   onPress={() => applyPreset(preset.category, preset.type)}
                 >
                   <RNView style={[styles.presetIcon, { backgroundColor: `${preset.accent}18` }]}>
@@ -420,12 +473,14 @@ export default function NewLoanScreen() {
                   </RNView>
                   <Text style={styles.presetTitle}>{preset.title}</Text>
                   <Text style={styles.presetSubtitle} numberOfLines={2}>{preset.subtitle}</Text>
+                  {active ? <RNView style={[styles.presetActivePill, { backgroundColor: preset.accent }]}><Text style={styles.presetActivePillText}>Selected</Text></RNView> : null}
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Card style={styles.sectionCard}>
+          <Card style={[styles.sectionCard, styles.sectionCardElevated]}>
+            <RNView style={[styles.sectionAccentBar, { backgroundColor: selectedPreset.accent }]} />
             <Text style={styles.sectionTitle}>Main details</Text>
             <Text style={styles.sectionSubtitle}>{selectedPreset.subtitle}</Text>
 
@@ -477,23 +532,23 @@ export default function NewLoanScreen() {
                 <Text style={styles.label}>Contact</Text>
                 <RNView style={styles.labelActions}>
                   <TouchableOpacity onPress={() => router.push('/new-contact?mode=friend')}>
-                    <Text style={styles.linkText}>+ Add friend</Text>
+                    <Text style={styles.linkText}>+ Link friend</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => router.push('/new-contact')}>
-                    <Text style={styles.linkTextMuted}>+ New contact</Text>
+                    <Text style={styles.linkTextMuted}>+ Add contact</Text>
                   </TouchableOpacity>
                 </RNView>
               </View>
               {contacts.length === 0 ? (
                 <Card style={styles.emptyInlineCard}>
-                  <Text style={styles.emptyInlineText}>Add a friend or contact first so this record has someone attached to it.</Text>
+                  <Text style={styles.emptyInlineText}>Add a contact first so this record has someone attached to it. Use the friend option only if they also use Buddy Balance.</Text>
                   <RNView style={styles.emptyInlineActions}>
                     <TouchableOpacity style={styles.emptyInlineButton} onPress={() => router.push('/new-contact?mode=friend')}>
                       <UserPlus size={16} color="#FFFFFF" />
-                      <Text style={styles.emptyInlineButtonText}>Add friend</Text>
+                      <Text style={styles.emptyInlineButtonText}>Link friend</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.emptyInlineSecondaryButton} onPress={() => router.push('/new-contact')}>
-                      <Text style={styles.emptyInlineSecondaryButtonText}>New contact</Text>
+                      <Text style={styles.emptyInlineSecondaryButtonText}>Add contact</Text>
                     </TouchableOpacity>
                   </RNView>
                 </Card>
@@ -503,8 +558,9 @@ export default function NewLoanScreen() {
                   onPress={() => setContactPickerVisible(true)}
                 >
                   <RNView style={styles.selectInputLeft}>
+                    <Text style={styles.selectInputEyebrow}>Contact</Text>
                     <Text style={[styles.selectInputText, !selectedContact && styles.selectInputPlaceholder]}>
-                      {selectedContact ? selectedContact.name : 'Select a contact'}
+                      {selectedContact ? selectedContact.name : 'Add contact'}
                     </Text>
                   </RNView>
                   <ChevronDown size={18} color="#64748B" />
@@ -532,7 +588,8 @@ export default function NewLoanScreen() {
             </View>
           </Card>
 
-          <Card style={styles.sectionCard}>
+          <Card style={[styles.sectionCard, styles.sectionCardElevated]}>
+            <RNView style={[styles.sectionAccentBar, { backgroundColor: '#F59E0B' }]} />
             <Text style={styles.sectionTitle}>Due date</Text>
             <Text style={styles.sectionSubtitle}>{dueLabel}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inlineList}>
@@ -573,7 +630,8 @@ export default function NewLoanScreen() {
           </TouchableOpacity>
 
           {showMoreOptions && (
-            <Card style={styles.sectionCard}>
+            <Card style={[styles.sectionCard, styles.sectionCardElevated]}>
+              <RNView style={[styles.sectionAccentBar, { backgroundColor: '#6366F1' }]} />
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Notes</Text>
                 <View style={styles.inlineInputRow}>
@@ -641,12 +699,16 @@ export default function NewLoanScreen() {
           )}
 
           <Card style={styles.summaryCard}>
+            <RNView style={[styles.summaryAccent, summaryTone]} />
             <Text style={styles.summaryEyebrow}>Ready to save</Text>
             <Text style={styles.summaryText}>
               {selectedPreset.title}
               {selectedContact ? ` with ${selectedContact.name}` : ''}
               {category === 'money' && amount ? ` for ${getCurrencySymbol(currency)}${amount}` : ''}
               {category === 'item' && itemName ? `: ${itemName}` : ''}
+            </Text>
+            <Text style={styles.summaryMeta}>
+              {selectedContact ? contactStatusLabel : 'Choose a contact before saving'} • {dueLabel}
             </Text>
           </Card>
 
@@ -689,7 +751,7 @@ export default function NewLoanScreen() {
             <RNView style={styles.currencyModalOverlay}>
               <Card style={styles.contactModalCard}>
                 <RNView style={styles.contactModalHeader}>
-                  <Text style={styles.currencyModalTitle}>Choose Contact</Text>
+                  <Text style={styles.currencyModalTitle}>Choose contact</Text>
                   <TouchableOpacity
                     style={styles.contactModalCloseButton}
                     onPress={() => {
@@ -746,6 +808,29 @@ export default function NewLoanScreen() {
                     </RNView>
                   ) : null}
                 </ScrollView>
+
+                <RNView style={styles.contactModalFooter}>
+                  <TouchableOpacity
+                    style={styles.contactModalPrimaryAction}
+                    onPress={() => {
+                      setContactPickerVisible(false);
+                      setContactSearchQuery('');
+                      router.push('/new-contact');
+                    }}
+                  >
+                    <Text style={styles.contactModalPrimaryActionText}>Add contact</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.contactModalSecondaryAction}
+                    onPress={() => {
+                      setContactPickerVisible(false);
+                      setContactSearchQuery('');
+                      router.push('/new-contact?mode=friend');
+                    }}
+                  >
+                    <Text style={styles.contactModalSecondaryActionText}>Link friend account</Text>
+                  </TouchableOpacity>
+                </RNView>
               </Card>
             </RNView>
           </Modal>
@@ -799,30 +884,129 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scroll: {
-    padding: 20,
-    paddingTop: 116,
-    paddingBottom: 48,
+    padding: 18,
+    paddingTop: 108,
+    paddingBottom: 52,
     gap: 16,
   },
   heroCard: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 20,
+    borderRadius: 30,
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
   },
-  eyebrow: {
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+    backgroundColor: 'transparent',
+  },
+  heroBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
+  },
+  heroBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: '#475569',
+  },
+  heroStatusPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
+  },
+  heroStatusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  heroText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#475569',
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+    marginBottom: 16,
+    backgroundColor: 'transparent',
+  },
+  heroStatCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.16)',
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: '#64748B',
     marginBottom: 6,
   },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: '900',
+  heroStatValue: {
+    fontSize: 18,
+    fontWeight: '800',
     color: '#0F172A',
-    marginBottom: 6,
   },
-  heroText: {
+  heroMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  heroMetaChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.66)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.16)',
+  },
+  heroMetaChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  sectionHeaderRow: {
+    paddingHorizontal: 2,
+    backgroundColor: 'transparent',
+  },
+  sectionKicker: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+    color: '#6366F1',
+    marginBottom: 4,
+  },
+  sectionHint: {
     fontSize: 14,
     lineHeight: 20,
     color: '#64748B',
@@ -836,19 +1020,23 @@ const styles = StyleSheet.create({
   },
   presetCard: {
     width: '48%',
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderRadius: 26,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
   },
   presetCardActive: {
-    borderColor: '#0F172A',
-    shadowColor: '#000',
+    backgroundColor: '#FFFFFF',
     shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowRadius: 16,
+    elevation: 4,
   },
   presetIcon: {
     width: 34,
@@ -869,8 +1057,36 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: '#64748B',
   },
+  presetActivePill: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  presetActivePillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: '#F8FAFC',
+  },
   sectionCard: {
     padding: 20,
+    borderRadius: 28,
+  },
+  sectionCardElevated: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 3,
+  },
+  sectionAccentBar: {
+    width: 52,
+    height: 5,
+    borderRadius: 999,
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 19,
@@ -1050,21 +1266,37 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFF',
     paddingHorizontal: 16,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   selectInputActive: {
     borderColor: '#6366F1',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#6366F1',
+    shadowOpacity: 0.12,
   },
   selectInputLeft: {
     flex: 1,
     backgroundColor: 'transparent',
     marginRight: 12,
+  },
+  selectInputEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: '#64748B',
+    marginBottom: 4,
   },
   selectInputText: {
     fontSize: 16,
@@ -1182,10 +1414,27 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     padding: 18,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  summaryAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+  },
+  summaryAccentPositive: {
+    backgroundColor: '#10B981',
+  },
+  summaryAccentNegative: {
+    backgroundColor: '#EF4444',
   },
   summaryEyebrow: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#64748B',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -1193,10 +1442,16 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   summaryText: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '700',
+  },
+  summaryMeta: {
+    marginTop: 10,
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
   },
   currencyModalOverlay: {
     flex: 1,
@@ -1280,6 +1535,33 @@ const styles = StyleSheet.create({
   contactModalEmptyText: {
     fontSize: 14,
     color: '#64748B',
+  },
+  contactModalFooter: {
+    gap: 10,
+    marginTop: 4,
+    backgroundColor: 'transparent',
+  },
+  contactModalPrimaryAction: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+  },
+  contactModalPrimaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  contactModalSecondaryAction: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+  },
+  contactModalSecondaryActionText: {
+    color: '#4F46E5',
+    fontSize: 15,
+    fontWeight: '800',
   },
   currencyModalTitle: {
     fontSize: 20,

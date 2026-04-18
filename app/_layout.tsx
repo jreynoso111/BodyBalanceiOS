@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SystemUI from 'expo-system-ui';
 
 import { ReferralRewardModal } from '@/components/ReferralRewardModal';
+import { AppUpdatePrompt } from '@/components/AppUpdatePrompt';
 import { AppBiometricGate } from '@/components/AppBiometricGate';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
@@ -142,6 +143,7 @@ function RootLayoutNav() {
           <Stack.Screen name="faq" options={{ title: 'FAQ' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         </Stack>
+        <AppUpdatePrompt />
         <AppBiometricGate />
         <ReferralRewardModal />
       </ThemeProvider>

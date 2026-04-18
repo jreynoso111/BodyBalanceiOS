@@ -104,6 +104,7 @@ export default function ContactsScreen() {
   const { width } = useWindowDimensions();
 
   const isTablet = width >= 768;
+  const compactExpandedLayout = width < 720;
   const horizontalPadding = isTablet ? 28 : 20;
   const maxContentWidth = isTablet ? 760 : undefined;
   const bottomInset = Math.max(insets.bottom, 12);
@@ -444,9 +445,15 @@ export default function ContactsScreen() {
 
               {isExpanded && (
                 <Card style={styles.expandedCard}>
-                  <RNView style={[styles.expandedHeaderRow, styles.expandedHeaderRowTop]}>
+                  <RNView
+                    style={[
+                      styles.expandedHeaderRow,
+                      styles.expandedHeaderRowTop,
+                      compactExpandedLayout && styles.expandedHeaderRowStacked,
+                    ]}
+                  >
                     <Text style={styles.expandedSectionTitle}>Contact snapshot</Text>
-                    <RNView style={styles.inlineActionsRow}>
+                    <RNView style={[styles.inlineActionsRow, compactExpandedLayout && styles.inlineActionsRowStacked]}>
                       <TouchableOpacity
                         style={styles.inlineActionButton}
                         onPress={() =>
@@ -543,110 +550,124 @@ export default function ContactsScreen() {
                     ) : null}
                   </RNView>
 
-                  <RNView style={styles.expandedHeaderRow}>
-                    <Text style={styles.expandedSectionTitle}>Recent activity</Text>
-                    {item.historyEntries.length > 0 ? (
-                      <TouchableOpacity style={styles.inlineLinkButton} onPress={() => openHistoryModal(item)}>
-                        <Text style={styles.inlineLinkText}>View history</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </RNView>
-
-                  {recentHistory.length === 0 ? (
-                    <Text style={styles.emptyInlineText}>No activity recorded with this contact yet.</Text>
-                  ) : (
-                    <RNView style={styles.activityList}>
-                      {recentHistory.map((event, index) => (
-                        <TouchableOpacity
-                          key={event.id}
-                          activeOpacity={0.85}
-                          style={[styles.activityRow, index === recentHistory.length - 1 && styles.activityRowLast]}
-                          onPress={() => router.push(`/loan/${event.loanId}`)}
-                        >
-                          <RNView style={styles.activityCopy}>
-                            <Text style={styles.activityTitle}>{event.title}</Text>
-                            <Text style={styles.activitySubtitle}>{event.subtitle}</Text>
-                          </RNView>
-                          <RNView style={styles.activityRight}>
-                            {event.value ? <Text style={[styles.activityValue, event.valueColor ? { color: event.valueColor } : null]}>{event.value}</Text> : null}
-                            <Text style={styles.activityDate}>{formatActivityDate(event.occurredAt)}</Text>
-                          </RNView>
+                  <RNView style={styles.expandedSectionBlock}>
+                    <RNView
+                      style={[
+                        styles.expandedHeaderRow,
+                        compactExpandedLayout && styles.expandedHeaderRowStacked,
+                      ]}
+                    >
+                      <Text style={styles.expandedSectionTitle}>Recent activity</Text>
+                      {item.historyEntries.length > 0 ? (
+                        <TouchableOpacity style={styles.inlineLinkButton} onPress={() => openHistoryModal(item)}>
+                          <Text style={styles.inlineLinkText}>View history</Text>
                         </TouchableOpacity>
-                      ))}
+                      ) : null}
                     </RNView>
-                  )}
 
-                  <RNView style={styles.expandedHeaderRow}>
-                    <Text style={styles.expandedSectionTitle}>Open records</Text>
-                    <Text style={styles.sectionMeta}>{item.activeLoansList.length}</Text>
+                    {recentHistory.length === 0 ? (
+                      <Text style={styles.emptyInlineText}>No activity recorded with this contact yet.</Text>
+                    ) : (
+                      <RNView style={styles.activityList}>
+                        {recentHistory.map((event, index) => (
+                          <TouchableOpacity
+                            key={event.id}
+                            activeOpacity={0.85}
+                            style={[styles.activityRow, index === recentHistory.length - 1 && styles.activityRowLast]}
+                            onPress={() => router.push(`/loan/${event.loanId}`)}
+                          >
+                            <RNView style={styles.activityCopy}>
+                              <Text style={styles.activityTitle}>{event.title}</Text>
+                              <Text style={styles.activitySubtitle}>{event.subtitle}</Text>
+                            </RNView>
+                            <RNView style={styles.activityRight}>
+                              {event.value ? <Text style={[styles.activityValue, event.valueColor ? { color: event.valueColor } : null]}>{event.value}</Text> : null}
+                              <Text style={styles.activityDate}>{formatActivityDate(event.occurredAt)}</Text>
+                            </RNView>
+                          </TouchableOpacity>
+                        ))}
+                      </RNView>
+                    )}
                   </RNView>
 
-                  {item.activeLoansList.length === 0 ? (
-                    <Text style={styles.emptyInlineText}>Nothing open with this contact right now.</Text>
-                  ) : (
-                    item.activeLoansList.map((loan, idx) => (
-                      <RNView
-                        key={loan.id}
-                        style={[
-                          styles.openRecordRow,
-                          idx === item.activeLoansList.length - 1 && styles.openRecordRowLast,
-                        ]}
-                      >
-                        <TouchableOpacity
-                          activeOpacity={0.85}
-                          onPress={() => router.push(`/loan/${loan.id}`)}
-                        >
-                          <RNView style={styles.openRecordContent}>
-                            <RNView style={styles.openRecordCopy}>
-                              <Text style={styles.openRecordTitle}>
-                                {loan.category === 'money' ? 'Money record' : loan.item_name || 'Item record'}
-                              </Text>
-                              {loan.due_date ? (
-                                <Text style={styles.openRecordMeta}>
-                                  {loan.category === 'money' ? 'Due' : 'Expected'} {formatSimpleDate(loan.due_date)}
-                                </Text>
-                              ) : (
-                                <Text style={styles.openRecordMeta}>No due date</Text>
-                              )}
-                              <Text style={styles.openRecordHint}>Tap to open details</Text>
-                            </RNView>
-                            <RNView style={styles.openRecordRight}>
-                              {loan.category === 'money' ? (
-                                <Text style={[styles.openRecordValue, loan.type === 'lent' ? styles.summaryPositive : styles.summaryNegative]}>
-                                  {getCurrencySymbol(loan.currency || 'USD')}{Math.round(Number(loan.remaining || 0)).toLocaleString()}
-                                </Text>
-                              ) : (
-                                <Text style={styles.openRecordValue}>Active</Text>
-                              )}
-                              <Text style={styles.openRecordType}>{loan.type === 'lent' ? 'Lent' : 'Borrowed'}</Text>
-                            </RNView>
-                          </RNView>
-                        </TouchableOpacity>
+                  <RNView style={styles.expandedSectionBlock}>
+                    <RNView
+                      style={[
+                        styles.expandedHeaderRow,
+                        compactExpandedLayout && styles.expandedHeaderRowStacked,
+                      ]}
+                    >
+                      <Text style={styles.expandedSectionTitle}>Open records</Text>
+                      <Text style={styles.sectionMeta}>{item.activeLoansList.length}</Text>
+                    </RNView>
 
-                        {loan.category === 'money' && (
-                          <RNView style={styles.recordActionRow}>
-                            <TouchableOpacity
-                              activeOpacity={0.85}
-                              onPress={() =>
-                                router.push({
-                                  pathname: '/payment',
-                                  params: {
-                                    loanId: String(loan.id),
-                                    remaining: String(Math.max(Number(loan.remaining) || 0, 0)),
-                                    currency: String(loan.currency || 'USD'),
-                                    category: String(loan.category || 'money'),
-                                  },
-                                })
-                              }
-                              style={styles.recordActionButton}
-                            >
-                              <Text style={styles.recordActionText}>Add payment</Text>
-                            </TouchableOpacity>
-                          </RNView>
-                        )}
-                      </RNView>
-                    ))
-                  )}
+                    {item.activeLoansList.length === 0 ? (
+                      <Text style={styles.emptyInlineText}>Nothing open with this contact right now.</Text>
+                    ) : (
+                      item.activeLoansList.map((loan, idx) => (
+                        <RNView
+                          key={loan.id}
+                          style={[
+                            styles.openRecordRow,
+                            idx === item.activeLoansList.length - 1 && styles.openRecordRowLast,
+                          ]}
+                        >
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => router.push(`/loan/${loan.id}`)}
+                          >
+                            <RNView style={styles.openRecordContent}>
+                              <RNView style={styles.openRecordCopy}>
+                                <Text style={styles.openRecordTitle}>
+                                  {loan.category === 'money' ? 'Money record' : loan.item_name || 'Item record'}
+                                </Text>
+                                {loan.due_date ? (
+                                  <Text style={styles.openRecordMeta}>
+                                    {loan.category === 'money' ? 'Due' : 'Expected'} {formatSimpleDate(loan.due_date)}
+                                  </Text>
+                                ) : (
+                                  <Text style={styles.openRecordMeta}>No due date</Text>
+                                )}
+                                <Text style={styles.openRecordHint}>Tap to open details</Text>
+                              </RNView>
+                              <RNView style={styles.openRecordRight}>
+                                {loan.category === 'money' ? (
+                                  <Text style={[styles.openRecordValue, loan.type === 'lent' ? styles.summaryPositive : styles.summaryNegative]}>
+                                    {getCurrencySymbol(loan.currency || 'USD')}{Math.round(Number(loan.remaining || 0)).toLocaleString()}
+                                  </Text>
+                                ) : (
+                                  <Text style={styles.openRecordValue}>Active</Text>
+                                )}
+                                <Text style={styles.openRecordType}>{loan.type === 'lent' ? 'Lent' : 'Borrowed'}</Text>
+                              </RNView>
+                            </RNView>
+                          </TouchableOpacity>
+
+                          {loan.category === 'money' && (
+                            <RNView style={styles.recordActionRow}>
+                              <TouchableOpacity
+                                activeOpacity={0.85}
+                                onPress={() =>
+                                  router.push({
+                                    pathname: '/payment',
+                                    params: {
+                                      loanId: String(loan.id),
+                                      remaining: String(Math.max(Number(loan.remaining) || 0, 0)),
+                                      currency: String(loan.currency || 'USD'),
+                                      category: String(loan.category || 'money'),
+                                    },
+                                  })
+                                }
+                                style={styles.recordActionButton}
+                              >
+                                <Text style={styles.recordActionText}>Add payment</Text>
+                              </TouchableOpacity>
+                            </RNView>
+                          )}
+                        </RNView>
+                      ))
+                    )}
+                  </RNView>
                 </Card>
               )}
             </RNView>
@@ -1000,6 +1021,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
+  expandedHeaderRowStacked: {
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
   expandedSectionTitle: {
     fontSize: 13,
     fontWeight: '800',
@@ -1034,6 +1060,11 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: 'transparent',
     flex: 1,
+  },
+  inlineActionsRowStacked: {
+    width: '100%',
+    justifyContent: 'flex-start',
+    flex: 0,
   },
   inlineActionButton: {
     flexDirection: 'row',
@@ -1160,6 +1191,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#4F46E5',
+  },
+  expandedSectionBlock: {
+    marginTop: 4,
+    marginBottom: 8,
+    backgroundColor: 'transparent',
   },
   activityList: {
     borderWidth: 1,

@@ -361,10 +361,6 @@ export async function configureBillingForUser(user: BillingUser) {
     return null;
   }
 
-  if (Platform.OS === 'android' && hasAndroidBillingConfig()) {
-    await ensureBillingConnection();
-  }
-
   return null;
 }
 

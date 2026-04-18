@@ -128,6 +128,65 @@ async function fetchSubscriptionProduct({
   return response.json();
 }
 
+async function fetchTrackRelease({
+  packageName,
+  track,
+}: {
+  packageName: string;
+  track: string;
+}) {
+  const accessToken = await getGoogleAccessToken();
+  const url =
+    `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}` +
+    `/tracks/${encodeURIComponent(track)}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Google Play track lookup failed (${response.status}): ${errorText}`);
+  }
+
+  return response.json();
+}
+
+function pickLatestRelease(trackResponse: any) {
+  const releases = Array.isArray(trackResponse?.releases) ? trackResponse.releases : [];
+  if (releases.length === 0) return null;
+
+  const publishedReleases = releases.filter((release: any) => {
+    const status = String(release?.status || '').toLowerCase().trim();
+    return status !== 'draft';
+  });
+
+  const candidates = publishedReleases.length > 0 ? publishedReleases : releases;
+  const sorted = [...candidates].sort((left: any, right: any) => {
+    const leftVersion = Math.max(...((left?.versionCodes || []).map((value: any) => Number(value)).filter(Number.isFinite)));
+    const rightVersion = Math.max(...((right?.versionCodes || []).map((value: any) => Number(value)).filter(Number.isFinite)));
+    return rightVersion - leftVersion;
+  });
+
+  const latest = sorted[0];
+  const versionCodes = Array.isArray(latest?.versionCodes)
+    ? latest.versionCodes.map((value: any) => Number(value)).filter(Number.isFinite)
+    : [];
+
+  return {
+    name: latest?.name || null,
+    status: latest?.status || null,
+    versionCodes,
+    latestVersionCode: versionCodes.length > 0 ? Math.max(...versionCodes) : null,
+    userFraction: latest?.userFraction ?? null,
+    releaseNotes: Array.isArray(latest?.releaseNotes) ? latest.releaseNotes : [],
+  };
+}
+
 function resolvePlanTierFromGooglePurchase(purchase: any) {
   const subscriptionState = String(purchase?.subscriptionState || '')
     .toUpperCase()
@@ -215,6 +274,27 @@ Deno.serve(async (req) => {
 
     if (GOOGLE_PLAY_PACKAGE_NAME && packageName !== GOOGLE_PLAY_PACKAGE_NAME) {
       return json({ error: 'package_name does not match configured Google Play package.' }, 400);
+    }
+
+    if (mode === 'latest_release') {
+      const track = String(body?.track || 'internal').trim().toLowerCase();
+      if (!track) {
+        return json({ error: 'Missing track' }, 400);
+      }
+
+      const trackRelease = await fetchTrackRelease({
+        packageName,
+        track,
+      });
+      const latestRelease = pickLatestRelease(trackRelease);
+
+      return json({
+        ok: true,
+        appUserId: authData.user.id,
+        packageName,
+        track,
+        latestRelease,
+      });
     }
 
     if (!productId) {

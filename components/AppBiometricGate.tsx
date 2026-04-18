@@ -62,44 +62,55 @@ export function AppBiometricGate() {
         return;
       }
 
-      const cachedEnabled = await getCachedBiometricLockEnabled(userId);
-      if (!mounted) return;
+      try {
+        const cachedEnabled = await getCachedBiometricLockEnabled(userId);
+        if (!mounted) return;
 
-      setLoading(!hasResolvedRef.current || cachedEnabled);
+        setLoading(!hasResolvedRef.current || cachedEnabled);
 
-      if (cachedEnabled) {
-        setLockEnabled(true);
-        setRequiresUnlock(true);
-        setShouldPrompt(true);
-      }
+        if (cachedEnabled) {
+          setLockEnabled(true);
+          setRequiresUnlock(true);
+          setShouldPrompt(true);
+        }
 
-      const [preferenceResult, capability] = await Promise.all([
-        getOrCreateUserPreferences(userId),
-        getBiometricCapability(),
-      ]);
+        const [preferenceResult, capability] = await Promise.all([
+          getOrCreateUserPreferences(userId),
+          getBiometricCapability(),
+        ]);
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      if (preferenceResult.error) {
+        if (preferenceResult.error) {
+          setLabel(capability.label);
+          setLoading(false);
+          return;
+        }
+
+        const remoteEnabled =
+          Boolean(preferenceResult.data?.biometric_enabled) &&
+          capability.hasHardware &&
+          capability.isEnrolled;
+
+        await setCachedBiometricLockEnabled(userId, remoteEnabled);
+        hasResolvedRef.current = true;
+
         setLabel(capability.label);
+        setLockEnabled(remoteEnabled);
+        setRequiresUnlock(remoteEnabled);
+        setShouldPrompt(remoteEnabled);
+        setErrorMessage(null);
         setLoading(false);
-        return;
+      } catch (error) {
+        if (!mounted) return;
+        console.warn('biometric gate sync failed:', error);
+        hasResolvedRef.current = true;
+        setLockEnabled(false);
+        setRequiresUnlock(false);
+        setShouldPrompt(false);
+        setErrorMessage(null);
+        setLoading(false);
       }
-
-      const remoteEnabled =
-        Boolean(preferenceResult.data?.biometric_enabled) &&
-        capability.hasHardware &&
-        capability.isEnrolled;
-
-      await setCachedBiometricLockEnabled(userId, remoteEnabled);
-      hasResolvedRef.current = true;
-
-      setLabel(capability.label);
-      setLockEnabled(remoteEnabled);
-      setRequiresUnlock(remoteEnabled);
-      setShouldPrompt(remoteEnabled);
-      setErrorMessage(null);
-      setLoading(false);
     };
 
     void syncLockState();

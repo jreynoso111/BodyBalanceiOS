@@ -20,15 +20,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PublicCard, PublicSiteLayout } from '@/components/website/PublicSiteLayout';
 import { AppShowcase } from '@/components/website/AppShowcase';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/services/supabase';
 
 const { width } = Dimensions.get('window');
 
 export default function LandingPage() {
     const router = useRouter();
     const { colorScheme, theme } = useAppTheme();
+    const { user } = useAuthStore();
     const isDark = colorScheme === 'dark';
     const [activeAppSlide, setActiveAppSlide] = useState(0);
     const [activeNotificationSlide, setActiveNotificationSlide] = useState(0);
+    const authenticatedTarget = Platform.OS === 'web' ? '/settings' : '/(tabs)';
+    const handleGetStarted = async () => {
+        if (user) {
+            router.replace(authenticatedTarget as never);
+            return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+            router.replace(authenticatedTarget as never);
+            return;
+        }
+
+        router.push('/(auth)/login');
+    };
 
     const APP_SLIDES = [
         {
@@ -363,7 +381,7 @@ export default function LandingPage() {
                                 isDark && styles.buttonDark,
                                 pressed && { transform: [{ scale: 0.98 }] }
                             ]}
-                            onPress={() => router.push('/(auth)/login')}
+                            onPress={handleGetStarted}
                         >
                             <Text style={[styles.buttonText, isDark && styles.buttonTextDark]}>Get Started</Text>
                             <ArrowRight size={20} color={isDark ? '#F8FAFC' : '#FFFFFF'} strokeWidth={3} />
