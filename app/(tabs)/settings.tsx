@@ -246,9 +246,6 @@ export default function SettingsScreen() {
                         <TouchableOpacity style={styles.webSecondaryButton} onPress={handleSignOut} disabled={signingOut}>
                             <Text style={styles.webSecondaryButtonText}>{signingOut ? 'Signing out...' : 'Sign out'}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.webDangerButton} onPress={() => router.push('/delete-account')}>
-                            <Text style={styles.webDangerButtonText}>Delete account</Text>
-                        </TouchableOpacity>
                     </Card>
                 </View>
             </WebAccountLayout>
@@ -309,11 +306,6 @@ export default function SettingsScreen() {
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} disabled={signingOut}>
                     <LogOut size={20} color="#EF4444" />
                     <Text style={styles.signOutText}>{signingOut ? 'Signing Out...' : 'Sign Out'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.deleteAccountButton} onPress={() => router.push('/delete-account')}>
-                    <Trash2 size={20} color="#B91C1C" />
-                    <Text style={styles.deleteAccountText}>Delete Account</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.version}>Buddy Balance v1.0.0</Text>

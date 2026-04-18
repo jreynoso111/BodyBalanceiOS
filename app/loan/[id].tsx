@@ -107,7 +107,7 @@ export default function LoanDetailScreen() {
         setLoading(true);
         const { data: loanData, error: loanError } = await supabase
             .from('loans')
-            .select('*, contacts(name)')
+            .select('*, contacts(id, name, target_user_id, link_status)')
             .eq('id', loanId)
             .is('deleted_at', null)
             .maybeSingle();
@@ -655,6 +655,8 @@ export default function LoanDetailScreen() {
         return Number.isFinite(paymentAmount) ? acc + paymentAmount : acc;
     }, 0);
     const remaining = Math.max(safeLoanAmount - totalPaid, 0);
+    const contactLinkStatus = String(loan?.contacts?.link_status || (loan?.contacts?.target_user_id ? 'accepted' : 'private')).toLowerCase();
+    const canLinkContactAccount = Boolean(loan?.contacts?.id) && contactLinkStatus !== 'accepted';
     const canSuggestNewTotal = loan.category === 'money' && loan.status !== 'paid' && !!loan.target_user_id;
     const canAdjustTotalDirectly = loan.category === 'money' && loan.status !== 'paid' && !canSuggestNewTotal;
 
@@ -728,6 +730,25 @@ export default function LoanDetailScreen() {
                             <Text style={styles.headerSub}>
                                 {loan.category === 'item' ? 'Shared item' : (loan.type === 'lent' ? 'You shared money' : 'You received money')}
                             </Text>
+                            {canLinkContactAccount ? (
+                                <TouchableOpacity
+                                    style={styles.linkContactButton}
+                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        router.push({
+                                            pathname: '/new-contact',
+                                            params: {
+                                                id: String(loan.contacts.id),
+                                                mode: 'friend',
+                                            },
+                                        })
+                                    }
+                                >
+                                    <Text style={styles.linkContactButtonText}>
+                                        {contactLinkStatus === 'pending' ? 'Review friend link' : 'Link this contact to an account'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : null}
                         </RNView>
                     </RNView>
 
@@ -1369,6 +1390,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#64748B',
         marginTop: 2,
+    },
+    linkContactButton: {
+        alignSelf: 'flex-start',
+        marginTop: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#EEF2FF',
+        borderWidth: 1,
+        borderColor: '#C7D2FE',
+    },
+    linkContactButtonText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#4F46E5',
     },
     amountLabel: {
         fontSize: 12,
