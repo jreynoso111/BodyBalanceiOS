@@ -8,7 +8,7 @@
       "distribution": "internal",
       "env": {
         "APP_ENV": "development",
-        "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "false"
+        "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "true"
       }
     },
     "development-simulator": {
@@ -21,14 +21,18 @@
       "distribution": "internal",
       "env": {
         "APP_ENV": "preview",
-        "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "false"
+        "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "true",
+        "EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID": "premium_annual",
+        "EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID": "premium_monthly"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "APP_ENV": "production",
-        "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "false"
+        "EXPO_PUBLIC_ENABLE_GOOGLE_AUTH": "true",
+        "EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID": "premium_annual",
+        "EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID": "premium_monthly"
       }
     }
   },
