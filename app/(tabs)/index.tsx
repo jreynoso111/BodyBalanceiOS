@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, View as RNView, RefreshControl, Share, Alert } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, View as RNView, RefreshControl, Share, Alert, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, View, Screen, Card } from '@/components/Themed';
 import { supabase } from '@/services/supabase';
@@ -62,7 +62,9 @@ export default function DashboardScreen() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() || 'light';
+  const compactDashboardLayout = width < 920;
   const bottomInset = Math.max(insets.bottom, 12);
   const fabBottomOffset = bottomInset + 16;
   const scrollBottomPadding = fabBottomOffset + 84;
@@ -521,14 +523,14 @@ export default function DashboardScreen() {
         </Card>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, compactDashboardLayout && styles.sectionHeaderStacked]}>
             <Text style={styles.sectionTitle}>Coming up</Text>
             <TouchableOpacity onPress={() => router.push('/requests')}>
               <Text style={styles.sectionLink}>Confirmations</Text>
             </TouchableOpacity>
           </View>
 
-          <RNView style={styles.insightRow}>
+          <RNView style={[styles.insightRow, compactDashboardLayout && styles.insightRowStacked]}>
             <Card style={styles.insightCard}>
               <RNView style={[styles.insightIcon, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
                 <AlertTriangle size={18} color="#F59E0B" />
@@ -588,10 +590,10 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, compactDashboardLayout && styles.sectionHeaderStacked]}>
             <Text style={styles.sectionTitle}>Recent records</Text>
             <TouchableOpacity
-              style={styles.sectionToggle}
+              style={[styles.sectionToggle, compactDashboardLayout && styles.sectionToggleStacked]}
               activeOpacity={0.85}
               onPress={() => setRecentSectionExpanded((current) => !current)}
             >
@@ -624,9 +626,9 @@ export default function DashboardScreen() {
           ) : (
             recentLoans.map((item) => (
               <Card key={item.id} style={[styles.listCard, styles.recentRecordCard]}>
-                <RNView style={styles.recentRecordHeader}>
+                <RNView style={[styles.recentRecordHeader, compactDashboardLayout && styles.recentRecordHeaderStacked]}>
                   <TouchableOpacity
-                    style={styles.listLeft}
+                    style={[styles.listLeft, compactDashboardLayout && styles.listLeftStacked]}
                     activeOpacity={0.85}
                     onPress={() => router.push(`/loan/${item.id}`)}
                   >
@@ -642,8 +644,8 @@ export default function DashboardScreen() {
                       <Text style={styles.recentRecordSummary}>{getRecentRecordSummary(item)}</Text>
                     </View>
                   </TouchableOpacity>
-                  <RNView style={styles.recentRecordHeaderRight}>
-                    <RNView style={styles.listRight}>
+                  <RNView style={[styles.recentRecordHeaderRight, compactDashboardLayout && styles.recentRecordHeaderRightStacked]}>
+                    <RNView style={[styles.listRight, compactDashboardLayout && styles.listRightStacked]}>
                       <Text style={[styles.amountText, { color: item.category === 'money' ? (item.type === 'lent' ? '#10B981' : '#EF4444') : '#6366F1' }]}>{getRecentRecordValue(item)}</Text>
                       <Text style={styles.statusBadge}>{item.status}</Text>
                     </RNView>
@@ -1195,6 +1197,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     backgroundColor: 'transparent',
   },
+  sectionHeaderStacked: {
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
   sectionTitle: {
     fontSize: 21,
     fontWeight: '800',
@@ -1214,6 +1221,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
   },
+  sectionToggleStacked: {
+    alignSelf: 'flex-start',
+  },
   sectionToggleText: {
     fontSize: 13,
     fontWeight: '800',
@@ -1225,9 +1235,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     backgroundColor: 'transparent',
   },
+  insightRowStacked: {
+    flexWrap: 'wrap',
+  },
   insightCard: {
     flex: 1,
     padding: 14,
+    minWidth: 200,
   },
   insightIcon: {
     width: 34,
@@ -1309,17 +1323,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
+  recentRecordHeaderStacked: {
+    alignItems: 'stretch',
+    gap: 12,
+  },
   recentRecordHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'transparent',
     marginLeft: 12,
   },
+  recentRecordHeaderRightStacked: {
+    width: '100%',
+    marginLeft: 0,
+    justifyContent: 'space-between',
+  },
   listLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  listLeftStacked: {
+    width: '100%',
+    flex: 0,
   },
   iconBox: {
     width: 46,
@@ -1358,6 +1385,9 @@ const styles = StyleSheet.create({
   listRight: {
     alignItems: 'flex-end',
     backgroundColor: 'transparent',
+  },
+  listRightStacked: {
+    alignItems: 'flex-start',
   },
   amountText: {
     fontSize: 16,
