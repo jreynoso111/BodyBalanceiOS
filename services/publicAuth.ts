@@ -7,11 +7,40 @@ type PublicAuthPayload = {
   redirectTo?: string;
 };
 
+async function readFunctionErrorMessage(error: any) {
+  const fallbackMessage = error?.message || 'Could not complete the request right now.';
+  const response = error?.context;
+
+  if (!response || typeof response !== 'object' || typeof response.text !== 'function') {
+    return fallbackMessage;
+  }
+
+  try {
+    const rawText = await response.text();
+    if (!rawText) {
+      return fallbackMessage;
+    }
+
+    try {
+      const parsed = JSON.parse(rawText);
+      if (typeof parsed?.error === 'string' && parsed.error.trim()) {
+        return parsed.error.trim();
+      }
+    } catch {
+      // Fall back to raw text when the response is not JSON.
+    }
+
+    return rawText;
+  } catch {
+    return fallbackMessage;
+  }
+}
+
 async function invokePublicAuth<T extends PublicAuthPayload>(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('public-auth', { body });
 
   if (error) {
-    throw new Error(error.message || 'Could not complete the request right now.');
+    throw new Error(await readFunctionErrorMessage(error));
   }
 
   if (!data?.ok) {

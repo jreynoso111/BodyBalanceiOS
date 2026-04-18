@@ -28,6 +28,14 @@ export default function SettingsScreen() {
     const normalizedRole = (role || '').toLowerCase().trim();
     const hasAdminAccess = normalizedRole === 'admin' || normalizedRole === 'administrator';
 
+    const navigateToLanding = () => {
+        const resetNavigation = (router as any)?.dismissAll;
+        if (typeof resetNavigation === 'function') {
+            resetNavigation.call(router);
+        }
+        router.replace('/');
+    };
+
     useFocusEffect(
         React.useCallback(() => {
             if (!user?.id) return;
@@ -93,7 +101,7 @@ export default function SettingsScreen() {
             setRole(null);
             setPlanTier('free');
             setLanguage(getDeviceLanguage());
-            router.replace('/');
+            navigateToLanding();
         } catch (error: any) {
             try {
                 await signOutLocalSession();
@@ -102,7 +110,7 @@ export default function SettingsScreen() {
                 setRole(null);
                 setPlanTier('free');
                 setLanguage(getDeviceLanguage());
-                router.replace('/');
+                navigateToLanding();
             } catch {
                 Alert.alert('Error', error?.message || 'Could not sign out right now.');
             }
@@ -146,7 +154,6 @@ export default function SettingsScreen() {
         { icon: Bell, label: 'Notifications', sub: prefs.push_enabled ? 'Enabled' : 'Disabled', onPress: () => router.push('/notifications') },
         { icon: Shield, label: 'Security', sub: prefs.biometric_enabled ? 'Biometric On' : 'Biometric Off', onPress: () => router.push('/security') },
         { icon: CircleHelp, label: 'Help & Support', sub: 'FAQ & guidance', onPress: () => router.push('/help-support') },
-        { icon: Trash2, label: 'Delete Account', sub: 'Permanent account removal', onPress: () => router.push('/delete-account') },
     ];
 
     if (hasPaidOrTrialAccess) {

@@ -7,13 +7,10 @@ import { Card, Screen, Text } from '@/components/Themed';
 import {
   describePackage,
   fetchPremiumOffering,
-  getBillingEntitlementIds,
   getBillingReadiness,
-  getBillingEntitlementId,
   getBillingUnavailableReason,
   isBillingAvailable,
   purchasePremiumPackage,
-  restorePremiumAccess,
 } from '@/services/billing';
 import {
   getMembershipStatus,
@@ -26,6 +23,7 @@ import { useAuthStore } from '@/store/authStore';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 
 export default function SubscriptionScreen() {
+  const playStoreLinkPlaceholder = 'https://play.google.com/store/apps/details?id=com.jreynoso.buddybalance';
   const planTier = useAuthStore((state) => state.planTier);
   const user = useAuthStore((state) => state.user);
   const initialized = useAuthStore((state) => state.initialized);
@@ -40,7 +38,6 @@ export default function SubscriptionScreen() {
       : 'Free plan';
   const unavailableReason = getBillingUnavailableReason();
   const [purchasePending, setPurchasePending] = React.useState(false);
-  const [restorePending, setRestorePending] = React.useState(false);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [sendingInvite, setSendingInvite] = React.useState(false);
   const [referralSummary, setReferralSummary] = React.useState<InviteSummary | null>(null);
@@ -50,6 +47,10 @@ export default function SubscriptionScreen() {
   const [billingReady, setBillingReady] = React.useState(false);
   const [billingStatusLoading, setBillingStatusLoading] = React.useState(Platform.OS === 'android' && isBillingAvailable());
   const [billingStatusReason, setBillingStatusReason] = React.useState<string | null>(unavailableReason);
+  const selectedPackageLabel =
+    premiumPackageOptions.find((option) => option.id === selectedPackageId)?.label ||
+    premiumPackageOptions[0]?.label ||
+    premiumPackageLabel;
 
   React.useEffect(() => {
     let active = true;
@@ -123,22 +124,6 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handleRestore = async () => {
-    if (restorePending) return;
-    setRestorePending(true);
-
-    try {
-      const result = await restorePremiumAccess();
-      if (result.synced && result.planTier === 'premium') {
-        Alert.alert('Premium restored', 'Your Google Play purchase was restored on this account.');
-      } else {
-        Alert.alert('Restore unavailable', result.error || 'No eligible Google Play purchase was found.');
-      }
-    } finally {
-      setRestorePending(false);
-    }
-  };
-
   const handleSendInviteEmail = async () => {
     const normalizedEmail = inviteEmail.trim().toLowerCase();
     if (!normalizedEmail) {
@@ -160,13 +145,17 @@ export default function SubscriptionScreen() {
       typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()
         ? user.user_metadata.full_name.trim()
         : user?.email || 'me';
-    const subject = 'Register on Buddy Balance with my friend code';
+    const subject = 'Install Buddy Balance and join me';
     const body =
       `Hi,\n\n` +
-      `${inviterLabel} is inviting you to register on Buddy Balance.\n\n` +
-      `When you create your account, use this friend code: ${referralSummary.inviteCode}\n\n` +
-      `Buddy Balance helps friends and family keep track of money and shared records in one place.\n\n` +
-      `See you in the app.`;
+      `${inviterLabel} invited you to join Buddy Balance.\n\n` +
+      `Download the app from Google Play here:\n` +
+      `${playStoreLinkPlaceholder}\n\n` +
+      `After you install it, create your account and enter this friend code:\n` +
+      `${referralSummary.inviteCode}\n\n` +
+      `Buddy Balance helps friends and family keep shared balances, payments, and records organized in one place.\n\n` +
+      `Once you are inside the app, add the code during signup so we can connect.\n\n` +
+      `See you there.`;
     const mailtoUrl =
       `mailto:${encodeURIComponent(normalizedEmail)}` +
       `?subject=${encodeURIComponent(subject)}` +
@@ -226,8 +215,8 @@ export default function SubscriptionScreen() {
             {[
               'Access after your 21-day free trial ends',
               'CSV exports and PDF sharing after the trial window',
-              'Priority support for account issues',
-              'Annual billing handled through Google Play',
+              'Premium status shared across the app and web account center',
+              'Google Play billing handled on Android',
               ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
             ].map((benefit) => (
               <RNView key={benefit} style={styles.webBenefitRow}>
@@ -291,8 +280,15 @@ export default function SubscriptionScreen() {
           <Text style={styles.heroText}>
             {membershipStatus === 'trial'
               ? `You have full access during your ${PREMIUM_TRIAL_DAYS}-day free trial.`
-              : 'Buddy Balance switches to Premium after the free trial ends.'} {premiumPackageLabel}.
+              : membershipStatus === 'premium'
+              ? 'Your account currently includes Premium access.'
+              : 'After the free trial ends, you can continue with Premium through Google Play.'}
           </Text>
+          {membershipStatus !== 'premium' && Platform.OS === 'android' ? (
+            <Text style={styles.heroSubtext}>
+              {selectedPackageLabel}
+            </Text>
+          ) : null}
           {membershipStatus !== 'premium' && Platform.OS === 'android' ? (
             <RNView style={styles.ctaGroup}>
               <TouchableOpacity
@@ -328,21 +324,10 @@ export default function SubscriptionScreen() {
                 </RNView>
               ) : null}
 
-              {Platform.OS === 'android' ? (
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  style={[styles.secondaryButton, (restorePending || !billingReady) && styles.buttonDisabled]}
-                  onPress={() => void handleRestore()}
-                  disabled={restorePending || !billingReady}
-                >
-                  {restorePending ? <ActivityIndicator size="small" color="#4F46E5" /> : <Text style={styles.secondaryButtonText}>Restore purchase</Text>}
-                </TouchableOpacity>
-              ) : null}
-
               {Platform.OS === 'android' && billingStatusLoading ? (
                 <Text style={styles.ctaHint}>Checking Google Play billing readiness…</Text>
               ) : isBillingAvailable() && billingReady ? (
-                <Text style={styles.ctaHint}>Use Google Play to buy or restore Premium directly from this screen.</Text>
+                <Text style={styles.ctaHint}>Use Google Play to buy Premium directly from this screen.</Text>
               ) : (
                 <Text style={styles.ctaHint}>{billingStatusReason || unavailableReason}</Text>
               )}
@@ -359,10 +344,9 @@ export default function SubscriptionScreen() {
           {[
             'Continued access after your free trial ends',
             'CSV exports and PDF sharing after the trial window',
-            'Priority support for account issues',
-            premiumPackageOptions.length > 1 ? 'Monthly or annual Google Play membership' : 'Annual Google Play membership',
+            'Premium status shared across the app and web account center',
+            premiumPackageOptions.length > 1 ? 'Monthly or annual Google Play billing on Android' : 'Annual Google Play billing on Android',
             ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
-            `Premium plan ids: "${getBillingEntitlementIds().join(', ') || getBillingEntitlementId()}"`,
           ].map((benefit) => (
             <RNView key={benefit} style={styles.benefitRow}>
               <RNView style={styles.benefitIcon}>
@@ -378,20 +362,15 @@ export default function SubscriptionScreen() {
             <Shield size={20} color="#1E293B" />
           </RNView>
           <Text style={styles.stateTitle}>
-            {billingStatusLoading ? 'Checking billing status' : billingReady ? 'Google Play billing is ready' : 'Billing status'}
+            {billingStatusLoading ? 'Checking Premium checkout' : billingReady ? 'Premium checkout is ready' : 'Premium checkout status'}
           </Text>
           <Text style={styles.stateText}>
             {billingStatusLoading
-              ? 'The app is verifying the Google Play connection and backend validation before enabling checkout.'
+              ? 'Buddy Balance is confirming that Premium checkout is available on this device.'
               : billingReady
-              ? 'Premium subscriptions and restores now run through Google Play on Android. The server validates the purchase token before the app marks this account as Premium.'
+              ? 'Premium can be purchased through Google Play on this device.'
               : billingStatusReason || unavailableReason}
           </Text>
-          {Platform.OS === 'android' ? (
-            <Text style={styles.stateFootnote}>
-              Current status: the app expects `EXPO_PUBLIC_ANDROID_PREMIUM_SUBSCRIPTION_ID` and optionally `EXPO_PUBLIC_ANDROID_PREMIUM_MONTHLY_SUBSCRIPTION_ID`, then validates completed purchases through the `google-play-sync` Supabase function.
-            </Text>
-          ) : null}
           {referralSummary ? (
             <Text style={styles.androidHint}>
               {referralSummary.premiumReferralExpiresAt
@@ -399,7 +378,6 @@ export default function SubscriptionScreen() {
                 : `${referralSummary.referralCount}/3 invite code uses earned toward your next free Premium month.`}
             </Text>
           ) : null}
-          {Platform.OS === 'android' && isBillingAvailable() ? <Text style={styles.androidHint}>Premium SKU: {getBillingEntitlementId()}</Text> : null}
         </Card>
 
         {membershipStatus !== 'premium' && referralSummary ? (
@@ -428,7 +406,7 @@ export default function SubscriptionScreen() {
               {sendingInvite ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Send invite</Text>}
             </TouchableOpacity>
             <Text style={styles.inviteHelper}>
-              This opens the device email app with a ready-to-send invitation that already includes your friend code.
+              This opens your email app with a ready-to-send message that includes a Google Play link placeholder and your friend code.
             </Text>
           </Card>
         ) : null}
@@ -477,6 +455,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: '#64748B',
+  },
+  heroSubtext: {
+    marginTop: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#475569',
+    fontWeight: '700',
   },
   ctaGroup: {
     marginTop: 20,

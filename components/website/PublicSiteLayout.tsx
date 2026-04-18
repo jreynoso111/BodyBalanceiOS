@@ -42,7 +42,7 @@ const SIGNALS = [
   'Shared records',
   'Notification events',
   'Friend-linked accounts',
-  'Premium exports',
+  'Trial + Premium state',
 ];
 
 function isActivePath(currentPath: string, matches: string[]) {
@@ -206,7 +206,7 @@ export function PublicSiteLayout({
             </View>
             <Text style={styles.footerNote}>
               Buddy Balance is rolling toward public release. This site hosts support, policies, and product context
-              while the mobile app gets finalized.
+              while Android billing, referral rewards, and the mobile experience keep moving toward release.
             </Text>
           </View>
           <AppLegalFooter style={styles.footerText} />

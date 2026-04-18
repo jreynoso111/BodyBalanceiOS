@@ -50,6 +50,14 @@ export const useAuth = () => {
     const profileSyncInFlightRef = useRef(false);
     const profileSyncQueuedRef = useRef(false);
 
+    const navigateToLanding = () => {
+        const resetNavigation = (router as any)?.dismissAll;
+        if (typeof resetNavigation === 'function') {
+            resetNavigation.call(router);
+        }
+        router.replace('/');
+    };
+
     const resetLocalAuthState = async () => {
         await AsyncStorage.removeItem(LAST_PROTECTED_PATH_KEY);
         await clearPersistedAuthState();
@@ -153,15 +161,19 @@ export const useAuth = () => {
     };
 
     const hydrateSignedInUser = async (sessionUser: NonNullable<typeof session>['user']) => {
-        await configureBillingForUser({
-            userId: sessionUser.id,
-            email: sessionUser.email ?? null,
-            phone: sessionUser.phone ?? null,
-            displayName:
-                typeof sessionUser.user_metadata?.full_name === 'string'
-                    ? sessionUser.user_metadata.full_name
-                    : null,
-        });
+        try {
+            await configureBillingForUser({
+                userId: sessionUser.id,
+                email: sessionUser.email ?? null,
+                phone: sessionUser.phone ?? null,
+                displayName:
+                    typeof sessionUser.user_metadata?.full_name === 'string'
+                        ? sessionUser.user_metadata.full_name
+                        : null,
+            });
+        } catch (error: any) {
+            console.error('billing initialization failed:', error?.message || error);
+        }
 
         try {
             await syncProfileState(sessionUser.id);
@@ -216,22 +228,30 @@ export const useAuth = () => {
         // 2. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                setSession(session);
-                setUser(session?.user ?? null);
+                try {
+                    setSession(session);
+                    setUser(session?.user ?? null);
 
-                if (session?.user?.id) {
-                    await hydrateSignedInUser(session.user);
-                } else {
-                    await configureBillingForUser({});
-                    setRole(null);
-                    setPlanTier('free');
-                    setLanguage(getDeviceLanguage());
-                    // Prevent stale protected-route recovery after a sign-out.
-                    await AsyncStorage.removeItem(LAST_PROTECTED_PATH_KEY);
-                }
+                    if (session?.user?.id) {
+                        await hydrateSignedInUser(session.user);
+                    } else {
+                        try {
+                            await configureBillingForUser({});
+                        } catch (error: any) {
+                            console.error('billing teardown failed:', error?.message || error);
+                        }
+                        setRole(null);
+                        setPlanTier('free');
+                        setLanguage(getDeviceLanguage());
+                        // Prevent stale protected-route recovery after a sign-out.
+                        await AsyncStorage.removeItem(LAST_PROTECTED_PATH_KEY);
+                    }
 
-                if (event === 'SIGNED_OUT') {
-                    router.replace('/');
+                    if (event === 'SIGNED_OUT') {
+                        navigateToLanding();
+                    }
+                } catch (error: any) {
+                    console.error('auth state change handling failed:', error?.message || error);
                 }
             }
         );
@@ -344,7 +364,7 @@ export const useAuth = () => {
             if (!session && !inAuthRoute && !isLandingPage && !isPublicMarketingRoute && !isEphemeralFormRoute) {
                 // User is not signed in and not in the auth group or landing page, redirect to landing page
                 if (pathname !== '/') {
-                    router.replace('/');
+                    navigateToLanding();
                 }
             }
         };

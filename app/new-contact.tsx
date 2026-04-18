@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, Text, Alert, KeyboardAvoidingView, Platform, ScrollView, RefreshControl, Modal, Pressable } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import * as Contacts from 'expo-contacts';
 import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { X, Check, Trash2 } from 'lucide-react-native';
 import { AppLegalFooter } from '@/components/AppLegalFooter';
+
+type DeviceContactOption = {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+};
 
 export default function NewContactScreen() {
     const { user } = useAuthStore();
@@ -28,6 +36,10 @@ export default function NewContactScreen() {
     const [duplicateFriendLabel, setDuplicateFriendLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [deviceContacts, setDeviceContacts] = useState<DeviceContactOption[]>([]);
+    const [deviceContactsVisible, setDeviceContactsVisible] = useState(false);
+    const [deviceContactsLoading, setDeviceContactsLoading] = useState(false);
+    const [deviceContactSearch, setDeviceContactSearch] = useState('');
     const scrollViewRef = useRef<ScrollView | null>(null);
     const screenTitle = contactId
         ? isFriendMode
@@ -165,6 +177,66 @@ export default function NewContactScreen() {
         } finally {
             setRefreshing(false);
         }
+    };
+
+    const loadDeviceContacts = async () => {
+        if (Platform.OS === 'web') {
+            Alert.alert('Unavailable', 'Phone contacts can only be imported from the mobile app.');
+            return;
+        }
+
+        try {
+            setDeviceContactsLoading(true);
+            const permission = await Contacts.requestPermissionsAsync();
+            if (permission.status !== 'granted') {
+                Alert.alert('Permission required', 'Allow contacts access to pick a person from your phone address book.');
+                return;
+            }
+
+            const response = await Contacts.getContactsAsync({
+                fields: [Contacts.Fields.Emails, Contacts.Fields.PhoneNumbers],
+                sort: Contacts.SortTypes.FirstName,
+            });
+
+            const mappedContacts = (response.data || [])
+                .map((contact) => {
+                    const primaryEmail = contact.emails?.find((item) => item.email)?.email?.trim() || '';
+                    const primaryPhone =
+                        contact.phoneNumbers?.find((item) => item.number)?.number?.trim() ||
+                        contact.phoneNumbers?.find((item) => item.digits)?.digits?.trim() ||
+                        '';
+
+                    return {
+                        id: String(contact.id),
+                        name: String(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '').trim(),
+                        email: primaryEmail,
+                        phone: primaryPhone,
+                    };
+                })
+                .filter((contact) => contact.name || contact.email || contact.phone)
+                .sort((left, right) => left.name.localeCompare(right.name));
+
+            setDeviceContacts(mappedContacts);
+            setDeviceContactSearch('');
+            setDeviceContactsVisible(true);
+        } catch (error: any) {
+            Alert.alert('Error', error?.message || 'Could not load phone contacts right now.');
+        } finally {
+            setDeviceContactsLoading(false);
+        }
+    };
+
+    const applyDeviceContact = (contact: DeviceContactOption) => {
+        if (contact.name) {
+            setName(contact.name);
+        }
+        if (contact.email) {
+            setEmail(contact.email);
+        }
+        if (contact.phone) {
+            setPhone(contact.phone);
+        }
+        setDeviceContactsVisible(false);
     };
 
     const upsertFriendRequest = async (options: {
@@ -463,6 +535,14 @@ export default function NewContactScreen() {
         }
     };
 
+    const normalizedDeviceContactSearch = deviceContactSearch.trim().toLowerCase();
+    const filteredDeviceContacts = deviceContacts.filter((contact) => {
+        if (!normalizedDeviceContactSearch) return true;
+        return [contact.name, contact.email, contact.phone]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(normalizedDeviceContactSearch));
+    });
+
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -504,6 +584,22 @@ export default function NewContactScreen() {
                     </View>
                 ) : null}
 
+                <View style={styles.importCard}>
+                    <Text style={styles.importTitle}>Import from phone contacts</Text>
+                    <Text style={styles.importText}>
+                        Pick someone from your address book and Buddy Balance will fill in their name, email, and phone when available.
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => void loadDeviceContacts()}
+                        disabled={deviceContactsLoading}
+                        style={[styles.importButton, deviceContactsLoading && styles.importButtonDisabled]}
+                    >
+                        <Text style={styles.importButtonText}>
+                            {deviceContactsLoading ? 'Loading contacts...' : 'Choose from phone contacts'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Full Name *</Text>
                     <TextInput
@@ -543,6 +639,7 @@ export default function NewContactScreen() {
                         keyboardType="email-address"
                         style={styles.input}
                     />
+                    <Text style={styles.helperText}>You can type any email manually or import one from phone contacts.</Text>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -600,6 +697,63 @@ export default function NewContactScreen() {
 
                 <AppLegalFooter style={styles.copyright} />
             </ScrollView>
+
+            <Modal
+                visible={deviceContactsVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => {
+                    setDeviceContactsVisible(false);
+                }}
+            >
+                <Pressable
+                    style={styles.contactPickerBackdrop}
+                    onPress={() => {
+                        setDeviceContactsVisible(false);
+                    }}
+                >
+                    <Pressable style={styles.contactPickerCard} onPress={(event) => event.stopPropagation()}>
+                        <View style={styles.contactPickerHeader}>
+                            <Text style={styles.contactPickerTitle}>Choose a phone contact</Text>
+                            <TouchableOpacity onPress={() => setDeviceContactsVisible(false)} style={styles.contactPickerCloseButton}>
+                                <Text style={styles.contactPickerCloseText}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.contactPickerSearchBox}>
+                            <TextInput
+                                placeholder="Search by name, email, or phone"
+                                value={deviceContactSearch}
+                                onChangeText={setDeviceContactSearch}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                style={styles.contactPickerSearchInput}
+                            />
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.contactPickerList}>
+                            {filteredDeviceContacts.map((contact) => (
+                                <TouchableOpacity
+                                    key={contact.id}
+                                    style={styles.contactPickerItem}
+                                    onPress={() => applyDeviceContact(contact)}
+                                >
+                                    <Text style={styles.contactPickerItemTitle}>{contact.name || contact.email || contact.phone}</Text>
+                                    <Text style={styles.contactPickerItemMeta}>
+                                        {[contact.email, contact.phone].filter(Boolean).join('  |  ') || 'No email or phone stored'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+
+                            {filteredDeviceContacts.length === 0 ? (
+                                <View style={styles.contactPickerEmpty}>
+                                    <Text style={styles.contactPickerEmptyText}>No phone contacts match that search.</Text>
+                                </View>
+                            ) : null}
+                        </ScrollView>
+                    </Pressable>
+                </Pressable>
+            </Modal>
 
             <Modal
                 visible={duplicateFriendVisible}
@@ -712,6 +866,40 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         color: '#4338CA',
     },
+    importCard: {
+        marginBottom: 20,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        backgroundColor: '#EFF6FF',
+    },
+    importTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#1D4ED8',
+    },
+    importText: {
+        marginTop: 6,
+        fontSize: 13,
+        lineHeight: 18,
+        color: '#1E40AF',
+    },
+    importButton: {
+        marginTop: 14,
+        borderRadius: 12,
+        backgroundColor: '#2563EB',
+        paddingVertical: 14,
+        alignItems: 'center',
+    },
+    importButtonDisabled: {
+        opacity: 0.7,
+    },
+    importButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '800',
+    },
     helperText: {
         marginTop: 8,
         fontSize: 12,
@@ -765,6 +953,82 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         marginTop: 32,
+    },
+    contactPickerBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        justifyContent: 'flex-end',
+    },
+    contactPickerCard: {
+        maxHeight: '82%',
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 28,
+    },
+    contactPickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    contactPickerTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#0F172A',
+    },
+    contactPickerCloseButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#E2E8F0',
+    },
+    contactPickerCloseText: {
+        color: '#0F172A',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    contactPickerSearchBox: {
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 14,
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 14,
+        marginBottom: 14,
+    },
+    contactPickerSearchInput: {
+        fontSize: 15,
+        color: '#0F172A',
+        paddingVertical: 14,
+    },
+    contactPickerList: {
+        paddingBottom: 8,
+    },
+    contactPickerItem: {
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+    },
+    contactPickerItemTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+    },
+    contactPickerItemMeta: {
+        marginTop: 4,
+        fontSize: 13,
+        lineHeight: 18,
+        color: '#64748B',
+    },
+    contactPickerEmpty: {
+        paddingVertical: 28,
+        alignItems: 'center',
+    },
+    contactPickerEmptyText: {
+        fontSize: 14,
+        color: '#64748B',
     },
     successModalBackdrop: {
         flex: 1,

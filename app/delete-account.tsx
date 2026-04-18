@@ -26,6 +26,14 @@ export default function DeleteAccountScreen() {
   const normalizedConfirmation = confirmation.trim().toUpperCase();
   const canDelete = normalizedConfirmation === CONFIRMATION_TEXT && !submitting;
 
+  const navigateToLanding = () => {
+    const resetNavigation = (router as any)?.dismissAll;
+    if (typeof resetNavigation === 'function') {
+      resetNavigation.call(router);
+    }
+    router.replace('/');
+  };
+
   React.useEffect(() => {
     if (!user?.id) return;
     void AsyncStorage.setItem(LAST_PROTECTED_PATH_KEY, '/(tabs)/settings').catch(() => null);
@@ -53,7 +61,7 @@ export default function DeleteAccountScreen() {
         setFeedback(null);
         await deleteMyAccount(normalizedConfirmation);
         await resetLocalSession();
-        router.replace('/');
+        navigateToLanding();
       } catch (error: any) {
         setFeedback(error?.message || 'Could not delete your account right now.');
         if (Platform.OS !== 'web') {

@@ -29,12 +29,18 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "versionCode": 8
+      "versionCode": 9
     },
     "plugins": [
       "expo-router",
       "expo-notifications",
       "expo-iap",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Buddy Balance to read your phone contacts so you can quickly create a contact from your address book."
+        }
+      ],
       "expo-secure-store",
       "expo-sharing",
       [

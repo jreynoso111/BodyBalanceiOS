@@ -24,6 +24,7 @@ export default function RegisterPaymentScreen() {
     const [paymentMethod, setPaymentMethod] = useState<'money' | 'item'>(normalizedLoanCategory === 'item' ? 'item' : 'money');
     const [amount, setAmount] = useState(normalizedRemaining?.toString() || '');
     const [returnedItem, setReturnedItem] = useState('');
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [note, setNote] = useState('');
     const [loading, setLoading] = useState(false);
     const [originalPayment, setOriginalPayment] = useState<any>(null);
@@ -98,6 +99,7 @@ export default function RegisterPaymentScreen() {
             setPaymentMethod(data.payment_method);
             setAmount(data.amount?.toString() || '');
             setReturnedItem(data.returned_item_name || '');
+            setPaymentDate(data.payment_date ? String(data.payment_date).split('T')[0] : new Date().toISOString().split('T')[0]);
             setNote(data.note || '');
         }
         setLoading(false);
@@ -134,6 +136,10 @@ export default function RegisterPaymentScreen() {
         }
         if (paymentMethod === 'item' && !returnedItem) {
             Alert.alert('Error', 'Please describe the item being returned/exchanged');
+            return;
+        }
+        if (!paymentDate || Number.isNaN(new Date(paymentDate).getTime())) {
+            Alert.alert('Error', 'Payment date must be a valid date (YYYY-MM-DD)');
             return;
         }
 
@@ -270,6 +276,7 @@ export default function RegisterPaymentScreen() {
 
         const parsedMoneyAmount = Number.parseFloat(amount);
         const moneyAmountValue = Number.isNaN(parsedMoneyAmount) ? null : parsedMoneyAmount;
+        const resolvedPaymentDate = new Date(`${paymentDate}T12:00:00`).toISOString();
         setLoading(true);
         try {
             const { data: senderProfile } = await supabase
@@ -332,10 +339,13 @@ export default function RegisterPaymentScreen() {
                 returned_item_name: string | null;
                 note: string | null;
                 payment_date: string;
+                previous_payment_date?: string | null;
             }) => {
                 if (!targetUserId || !counterpartLoanId) return;
 
-                const { data: existingCounterpartPayment, error: counterpartLookupError } = await supabase
+                let existingCounterpartPayment: { id: string } | null = null;
+
+                const { data: primaryCounterpartPayment, error: counterpartLookupError } = await supabase
                     .from('payments')
                     .select('id')
                     .eq('loan_id', counterpartLoanId)
@@ -345,6 +355,24 @@ export default function RegisterPaymentScreen() {
 
                 if (counterpartLookupError) {
                     throw counterpartLookupError;
+                }
+
+                existingCounterpartPayment = primaryCounterpartPayment;
+
+                if (!existingCounterpartPayment && payment.previous_payment_date && payment.previous_payment_date !== payment.payment_date) {
+                    const { data: previousCounterpartPayment, error: previousLookupError } = await supabase
+                        .from('payments')
+                        .select('id')
+                        .eq('loan_id', counterpartLoanId)
+                        .eq('target_user_id', user.id)
+                        .eq('payment_date', payment.previous_payment_date)
+                        .maybeSingle();
+
+                    if (previousLookupError) {
+                        throw previousLookupError;
+                    }
+
+                    existingCounterpartPayment = previousCounterpartPayment;
                 }
 
                 const payload = {
@@ -437,6 +465,7 @@ export default function RegisterPaymentScreen() {
                         payment_method: paymentMethod,
                         returned_item_name: paymentMethod === 'item' ? returnedItem.trim() : null,
                         note: note.trim() || null,
+                        payment_date: resolvedPaymentDate,
                         validation_status: targetUserId ? (requiresConfirmation ? 'pending' : 'approved') : 'none',
                     })
                     .eq('id', normalizedPaymentId);
@@ -492,7 +521,8 @@ export default function RegisterPaymentScreen() {
                         payment_method: paymentMethod,
                         returned_item_name: paymentMethod === 'item' ? returnedItem.trim() : null,
                         note: note.trim() || null,
-                        payment_date: originalPayment?.payment_date || new Date().toISOString(),
+                        payment_date: resolvedPaymentDate,
+                        previous_payment_date: originalPayment?.payment_date || null,
                     });
                     await createPaymentNotice({
                         id: normalizedPaymentId,
@@ -502,7 +532,6 @@ export default function RegisterPaymentScreen() {
                     });
                 }
             } else {
-                const paymentDate = new Date().toISOString();
                 const { data: newPayment, error: paymentError } = await supabase.from('payments').insert([
                     {
                         loan_id: normalizedLoanId,
@@ -512,7 +541,7 @@ export default function RegisterPaymentScreen() {
                         payment_method: paymentMethod,
                         returned_item_name: paymentMethod === 'item' ? returnedItem.trim() : null,
                         note: note.trim() || null,
-                        payment_date: paymentDate,
+                        payment_date: resolvedPaymentDate,
                         validation_status: targetUserId ? (requiresConfirmation ? 'pending' : 'approved') : 'none',
                     },
                 ]).select().single();
@@ -555,7 +584,7 @@ export default function RegisterPaymentScreen() {
                         payment_method: paymentMethod,
                         returned_item_name: paymentMethod === 'item' ? returnedItem.trim() : null,
                         note: note.trim() || null,
-                        payment_date: paymentDate,
+                        payment_date: resolvedPaymentDate,
                     });
                     await createPaymentNotice({
                         id: newPayment.id,
@@ -653,6 +682,23 @@ export default function RegisterPaymentScreen() {
                             </ThemedView>
                         </Card>
                     )}
+
+                    <Card style={styles.noteCard}>
+                        <Text style={styles.label}>Payment Date</Text>
+                        <TextInput
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor="#94A3B8"
+                            value={paymentDate}
+                            onChangeText={setPaymentDate}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            style={styles.input}
+                        />
+                        <ThemedView style={styles.helperRow}>
+                            <Info size={14} color="#64748B" />
+                            <Text style={styles.helperText}>Use the date when this payment actually happened.</Text>
+                        </ThemedView>
+                    </Card>
 
                     <Card style={styles.noteCard}>
                         <Text style={styles.label}>Note (Optional)</Text>

@@ -50,10 +50,10 @@ export default function LandingPage() {
             lines: ['Open balance summary', 'Shared events timeline', 'Zero-balance clarity'],
         },
         {
-            title: 'Premium controls',
-            subtitle: 'Export history and manage your plan.',
+            title: 'Membership and referrals',
+            subtitle: 'Review trial access, Premium status, and invite rewards.',
             accent: '#F59E0B',
-            lines: ['CSV export', 'Unlimited contacts', 'Admin-ready tools'],
+            lines: ['21-day free trial', 'Google Play checkout', 'Invite rewards toward Premium'],
         },
     ];
 
@@ -83,7 +83,7 @@ export default function LandingPage() {
             <PublicSiteLayout
                 eyebrow="Buddy Balance . Mobile Ledger . 2026"
                 title="The cleanest way to track what friends owe, what you owe, and what changed."
-                description="Buddy Balance turns informal lending into something readable: shared balances, friend-linked records, notifications that make sense, and premium export tools wrapped in a warm mobile-first interface."
+                description="Buddy Balance turns informal lending into something readable: shared balances, friend-linked records, notifications that make sense, and a 21-day trial that continues with Premium on Android through Google Play."
                 actions={[
                     { href: '/help-support', label: 'Explore the product' },
                     { href: '/contact' as Href, label: 'Visit support', variant: 'secondary' },
@@ -149,7 +149,7 @@ export default function LandingPage() {
                             <View style={styles.phoneMockNotch} />
                             <View style={styles.phoneMockHeader}>
                                 <Text style={styles.phoneMockTitle}>Settings</Text>
-                                <Text style={styles.phoneMockBadge}>Pro</Text>
+                                <Text style={styles.phoneMockBadge}>Trial</Text>
                             </View>
                             <View style={styles.phoneMockRow}>
                                 <Text style={styles.phoneMockLabel}>Security</Text>
@@ -160,7 +160,7 @@ export default function LandingPage() {
                                 <Text style={styles.phoneMockValue}>Enabled</Text>
                             </View>
                             <View style={styles.phoneMockCard}>
-                                <Text style={styles.phoneMockHint}>Export data and manage Premium in one place.</Text>
+                                <Text style={styles.phoneMockHint}>Review trial status, invite rewards, and Premium from one place.</Text>
                             </View>
                         </View>
                     </View>
@@ -268,15 +268,15 @@ export default function LandingPage() {
 
                     <PublicCard
                         title="What the product emphasizes"
-                        description="Instead of only showing totals, the interface foregrounds context: who acted, what changed, whether it needs approval, and whether the current state is neutral, owed, or owed-to-you."
+                        description="Instead of only showing totals, the interface foregrounds context: who acted, what changed, whether it needs approval, and how trial, Premium, and shared balance states are explained clearly."
                     >
                         <View style={styles.signalGrid}>
                             <SignalChip label="Zero balance is neutral" />
-                            <SignalChip label="Header shows Premium" />
+                            <SignalChip label="Header shows plan state" />
                             <SignalChip label="Contacts can add record" />
                             <SignalChip label="Admin stays separate" />
                             <SignalChip label="Biometric lock ready" />
-                            <SignalChip label="CSV exports for Premium" />
+                            <SignalChip label="Trial and Premium stay clear" />
                         </View>
                     </PublicCard>
                 </View>

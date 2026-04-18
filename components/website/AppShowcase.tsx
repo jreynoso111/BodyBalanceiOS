@@ -77,8 +77,8 @@ export function AppShowcase({ compact = false }: AppShowcaseProps) {
       <View style={[styles.backdropPlate, medium && styles.backdropPlateCompact, mobile && styles.backdropPlateMobile]}>
         <Text style={styles.stageLabel}>LIVE PRODUCT PREVIEW</Text>
         <Text style={styles.stageCopy}>
-          The web shows the same visual language as the mobile app: clear balances, friend actions, and a premium
-          layer that feels polished instead of financial-drab.
+          The web shows the same visual language as the mobile app: clear balances, friend actions, and membership
+          states that explain trial access, Premium, and referrals without fintech clutter.
         </Text>
       </View>
 
@@ -287,14 +287,14 @@ function ContactsScreen() {
 function PremiumScreen() {
   return (
     <View style={styles.screenBody}>
-      <ScreenHeader title="Settings" pill="PREMIUM" />
+      <ScreenHeader title="Membership" pill="TRIAL" />
       <LinearGradient colors={['#FFF4CB', '#FFE39C']} style={styles.premiumHero}>
         <View style={styles.premiumBadge}>
           <Crown size={18} color="#8A5A00" />
         </View>
-        <Text style={styles.premiumTitle}>Premium Plan</Text>
+        <Text style={styles.premiumTitle}>21-day free trial</Text>
         <Text style={styles.premiumText}>
-          Export CSV, keep unlimited records, and manage more shared history without clutter.
+          Review trial access, referral rewards, and Premium status before continuing with Google Play on Android.
         </Text>
       </LinearGradient>
 
@@ -310,8 +310,8 @@ function PremiumScreen() {
       />
       <SettingsRow
         icon={<Crown size={16} color="#F59E0B" />}
-        title="Export Data (CSV)"
-        subline="Premium feature"
+        title="Premium and referrals"
+        subline="Google Play checkout and invite rewards"
       />
     </View>
   );

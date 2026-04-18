@@ -9,20 +9,40 @@ export interface BiometricCapability {
   label: string;
 }
 
-function resolveBiometricLabel(methods: LocalAuthentication.AuthenticationType[]): string {
-  if (methods.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+function getMethodDisplayName(method: LocalAuthentication.AuthenticationType): string | null {
+  if (method === LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION) {
     return Platform.OS === 'ios' ? 'Face ID' : 'face recognition';
   }
 
-  if (methods.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+  if (method === LocalAuthentication.AuthenticationType.FINGERPRINT) {
     return Platform.OS === 'ios' ? 'Touch ID' : 'fingerprint';
   }
 
-  if (methods.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-    return 'iris';
+  if (method === LocalAuthentication.AuthenticationType.IRIS) {
+    return 'iris scan';
   }
 
-  return 'biometrics';
+  return null;
+}
+
+function resolveBiometricLabel(methods: LocalAuthentication.AuthenticationType[]): string {
+  const supportedLabels = methods
+    .map((method) => getMethodDisplayName(method))
+    .filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
+
+  if (supportedLabels.length === 0) {
+    return 'biometrics';
+  }
+
+  if (supportedLabels.length === 1) {
+    return supportedLabels[0];
+  }
+
+  if (supportedLabels.length === 2) {
+    return `${supportedLabels[0]} or ${supportedLabels[1]}`;
+  }
+
+  return `${supportedLabels.slice(0, -1).join(', ')}, or ${supportedLabels[supportedLabels.length - 1]}`;
 }
 
 export async function getBiometricCapability(): Promise<BiometricCapability> {
@@ -44,10 +64,9 @@ export async function getBiometricCapability(): Promise<BiometricCapability> {
 
 export async function promptBiometricVerification(label?: string): Promise<LocalAuthentication.LocalAuthenticationResult> {
   const displayLabel = label || 'biometrics';
-  const promptMessage =
-    displayLabel === 'Face ID' || displayLabel === 'Touch ID'
-      ? `Verify with ${displayLabel}`
-      : 'Verify with biometrics';
+  const promptMessage = displayLabel === 'biometrics'
+    ? 'Verify with biometrics'
+    : `Verify with ${displayLabel}`;
 
   return LocalAuthentication.authenticateAsync({
     promptMessage,

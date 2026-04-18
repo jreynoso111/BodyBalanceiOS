@@ -50,6 +50,14 @@ export function WebAccountLayout({
   const normalizedRole = String(role || '').toLowerCase().trim();
   const hasAdminAccess = normalizedRole === 'admin' || normalizedRole === 'administrator';
 
+  const navigateToLanding = () => {
+    const resetNavigation = (router as any)?.dismissAll;
+    if (typeof resetNavigation === 'function') {
+      resetNavigation.call(router);
+    }
+    router.replace('/');
+  };
+
   const signOut = async () => {
     await signOutLocalSession();
     setSession(null);
@@ -57,7 +65,7 @@ export function WebAccountLayout({
     setRole(null);
     setPlanTier('free');
     setLanguage(getDeviceLanguage());
-    router.replace('/');
+    navigateToLanding();
   };
 
   return (

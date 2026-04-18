@@ -444,7 +444,7 @@ export default function ContactsScreen() {
 
               {isExpanded && (
                 <Card style={styles.expandedCard}>
-                  <RNView style={styles.expandedHeaderRow}>
+                  <RNView style={[styles.expandedHeaderRow, styles.expandedHeaderRowTop]}>
                     <Text style={styles.expandedSectionTitle}>Contact snapshot</Text>
                     <RNView style={styles.inlineActionsRow}>
                       <TouchableOpacity
@@ -513,15 +513,15 @@ export default function ContactsScreen() {
                           {item.link_status === 'accepted'
                             ? 'Linked to a Buddy Balance account'
                             : item.link_status === 'pending'
-                              ? 'Friend invitation sent'
-                              : 'Link this contact to a friend account'}
+                              ? 'Friend link invitation sent'
+                              : 'Connect this contact with a Buddy Balance account'}
                         </Text>
                         <Text style={styles.accountLinkText}>
                           {item.link_status === 'accepted'
-                            ? 'Shared records with this person can sync across both accounts.'
+                            ? 'Shared records with this person can stay in sync across both accounts.'
                             : item.link_status === 'pending'
-                              ? 'Good to go. Your invitation is on its way, and shared records will start syncing as soon as they accept.'
-                              : 'If this person uses Buddy Balance, add their friend code to connect both accounts.'}
+                              ? 'This invitation is waiting for your friend. As soon as they accept it, both accounts can stay synced.'
+                              : 'If this person already uses Buddy Balance, add their friend code here so shared records can sync for both of you.'}
                         </Text>
                       </RNView>
                     </RNView>
@@ -996,12 +996,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: 'transparent',
   },
+  expandedHeaderRowTop: {
+    alignItems: 'flex-start',
+    gap: 12,
+  },
   expandedSectionTitle: {
     fontSize: 13,
     fontWeight: '800',
     color: '#0F172A',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+    flexShrink: 1,
+    paddingTop: 4,
   },
   sectionMeta: {
     fontSize: 12,
@@ -1023,8 +1029,11 @@ const styles = StyleSheet.create({
   inlineActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
     gap: 8,
     backgroundColor: 'transparent',
+    flex: 1,
   },
   inlineActionButton: {
     flexDirection: 'row',
