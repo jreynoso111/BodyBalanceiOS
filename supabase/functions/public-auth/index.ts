@@ -17,7 +17,7 @@ const LEGACY_PUBLIC_AUTH_ALLOWED_RESET_REDIRECTS = (Deno.env.get('PUBLIC_AUTH_AL
 const DEFAULT_RESET_REDIRECT_TO =
   Deno.env.get('PUBLIC_AUTH_RESET_REDIRECT_TO') ||
   LEGACY_PUBLIC_AUTH_ALLOWED_RESET_REDIRECTS[0] ||
-  'buddybalance://reset-password';
+  'https://buddybalance.net/reset-password';
 const PUBLIC_AUTH_WINDOW_MS = resolveWindowMs({
   minutesEnvName: 'PUBLIC_AUTH_WINDOW_MINUTES',
   legacyMsEnvName: 'PUBLIC_AUTH_RATE_LIMIT_WINDOW_MS',
@@ -220,6 +220,21 @@ function sanitizeResetRedirect(rawValue: string) {
   return DEFAULT_RESET_REDIRECT_TO;
 }
 
+function canonicalizeResetRedirect(rawValue: string) {
+  const sanitized = sanitizeResetRedirect(rawValue);
+
+  try {
+    const parsed = new URL(sanitized);
+    if (parsed.protocol === 'buddybalance:') {
+      return DEFAULT_RESET_REDIRECT_TO;
+    }
+  } catch {
+    return DEFAULT_RESET_REDIRECT_TO;
+  }
+
+  return sanitized;
+}
+
 function validateName(name: string) {
   if (!name.trim()) {
     throw new Error('Please enter your full name.');
@@ -295,7 +310,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'request_password_reset') {
-      const redirectTo = sanitizeResetRedirect(String(body?.redirectTo || ''));
+      const redirectTo = canonicalizeResetRedirect(String(body?.redirectTo || ''));
       const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
 
       if (error) {

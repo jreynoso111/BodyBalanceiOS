@@ -4,7 +4,22 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const DEFAULT_RESET_REDIRECT_TO = Deno.env.get('ADMIN_RESET_REDIRECT_TO') || 'buddybalance://reset-password';
+const DEFAULT_RESET_REDIRECT_TO = Deno.env.get('ADMIN_RESET_REDIRECT_TO') || 'https://buddybalance.net/reset-password';
+
+function normalizeResetRedirect(rawValue: string) {
+  const candidate = rawValue.trim() || DEFAULT_RESET_REDIRECT_TO;
+
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol === 'buddybalance:') {
+      return DEFAULT_RESET_REDIRECT_TO;
+    }
+  } catch {
+    return DEFAULT_RESET_REDIRECT_TO;
+  }
+
+  return candidate;
+}
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -71,7 +86,7 @@ Deno.serve(async (req) => {
 
     if (action === 'send_password_reset') {
       const email = String(body?.email || '').trim().toLowerCase();
-      const redirectTo = String(body?.redirectTo || DEFAULT_RESET_REDIRECT_TO).trim() || DEFAULT_RESET_REDIRECT_TO;
+      const redirectTo = normalizeResetRedirect(String(body?.redirectTo || DEFAULT_RESET_REDIRECT_TO));
 
       if (!email) {
         return json({ error: 'Missing email.' }, 400);

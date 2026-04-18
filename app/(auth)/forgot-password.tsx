@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, View as RNView } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import * as Linking from 'expo-linking';
 import { Mail, ArrowLeft } from 'lucide-react-native';
 
 import { Text, Screen, Card } from '@/components/Themed';
@@ -41,7 +40,7 @@ export default function ForgotPasswordScreen() {
         try {
             setLoading(true);
             setFeedback(null);
-            const redirectTo = Linking.createURL('/reset-password');
+            const redirectTo = 'https://buddybalance.net/reset-password';
             await requestPasswordReset({ email: normalizedEmail, redirectTo });
 
             showMessage(
