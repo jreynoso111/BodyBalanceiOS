@@ -290,7 +290,7 @@ export function getBillingUnavailableReason() {
   }
 
   if (Platform.OS === 'ios') {
-    return 'Android billing is live first. iOS billing is still pending App Store setup.';
+    return 'This release supports Premium checkout on Android through Google Play.';
   }
 
   return getMissingAndroidBillingConfigReason();

@@ -243,13 +243,29 @@ $$;
 revoke all on function public.find_profile_by_friend_code(text) from public;
 grant execute on function public.find_profile_by_friend_code(text) to authenticated;
 
--- 8) Storage bucket policies for receipts: path must start with "<auth.uid()>/"
+-- 8) Storage bucket policies for receipts
+insert into storage.buckets (id, name, public)
+values ('receipts', 'receipts', false)
+on conflict (id) do update
+set public = excluded.public;
+
 drop policy if exists receipts_select_own on storage.objects;
-create policy receipts_select_own on storage.objects
+drop policy if exists receipts_select_participants on storage.objects;
+create policy receipts_select_participants
+on storage.objects
 for select to authenticated
 using (
   bucket_id = 'receipts'
-  and (storage.foldername(name))[1] = auth.uid()::text
+  and (
+    (storage.foldername(name))[1] = auth.uid()::text
+    or exists (
+      select 1
+      from public.loans l
+      where l.evidence_url = name
+        and l.deleted_at is null
+        and (l.user_id = auth.uid() or l.target_user_id = auth.uid())
+    )
+  )
 );
 
 drop policy if exists receipts_insert_own on storage.objects;
@@ -287,9 +303,6 @@ on conflict (id) do update
 set public = excluded.public;
 
 drop policy if exists avatars_select_authenticated on storage.objects;
-create policy avatars_select_authenticated on storage.objects
-for select to authenticated
-using (bucket_id = 'avatars');
 
 drop policy if exists avatars_insert_own on storage.objects;
 create policy avatars_insert_own on storage.objects

@@ -4,6 +4,7 @@ import { Text, View, Screen, Card } from '@/components/Themed';
 import { AppLegalFooter } from '@/components/AppLegalFooter';
 import { useLocalSearchParams, useNavigation, useRouter, Stack, useFocusEffect } from 'expo-router';
 import { CommonActions } from '@react-navigation/native';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/services/supabase';
 import { ArrowLeft, Wallet, Calendar, Plus, Clock, FileText, Trash2, Edit, Box, ChevronRight, TrendingUp, TrendingDown, Zap, Activity, ShieldCheck, ShieldAlert, Shield, Bell, History, MoreHorizontal, Info, Share2, X } from 'lucide-react-native';
 import { useAuthStore } from '@/store/authStore';
@@ -48,6 +49,7 @@ export default function LoanDetailScreen() {
     const [adjustedTotal, setAdjustedTotal] = useState('');
     const [savingAdjustedTotal, setSavingAdjustedTotal] = useState(false);
     const [sharingPdf, setSharingPdf] = useState(false);
+    const [openingEvidence, setOpeningEvidence] = useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -675,6 +677,49 @@ export default function LoanDetailScreen() {
         }
     };
 
+    const handleOpenEvidence = async () => {
+        const evidencePath = String(loan?.evidence_url || '').trim();
+        if (!evidencePath) {
+            Alert.alert(t('Attachment'), t('No receipt is attached to this record.'));
+            return;
+        }
+
+        setOpeningEvidence(true);
+
+        try {
+            const { data, error } = await supabase.storage
+                .from('receipts')
+                .createSignedUrl(evidencePath, 60 * 10);
+
+            if (error) {
+                throw error;
+            }
+
+            const signedUrl = String(data?.signedUrl || '').trim();
+            if (!signedUrl) {
+                throw new Error(t('Could not prepare the attached receipt.'));
+            }
+
+            if (Platform.OS === 'web') {
+                if (typeof window !== 'undefined' && typeof window.open === 'function') {
+                    window.open(signedUrl, '_blank', 'noopener,noreferrer');
+                } else {
+                    throw new Error(t('This browser could not open the attached receipt.'));
+                }
+                return;
+            }
+
+            await WebBrowser.openBrowserAsync(signedUrl);
+        } catch (error: any) {
+            Alert.alert(
+                t('Attachment'),
+                error?.message || t('The attached receipt could not be opened right now.')
+            );
+        } finally {
+            setOpeningEvidence(false);
+        }
+    };
+
     if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#000" /></View>;
 
     const loanAmountValue = Number(loan.amount);
@@ -963,13 +1008,17 @@ export default function LoanDetailScreen() {
                         <Text style={styles.sectionTitle}>{t('Evidence')}</Text>
                         <TouchableOpacity
                             style={styles.attachmentButton}
-                            onPress={() => {
-                                const { data } = supabase.storage.from('receipts').getPublicUrl(loan.evidence_url);
-                                Alert.alert(t('Attachment'), t('Opening secure receipt view...'));
-                            }}
+                            onPress={() => void handleOpenEvidence()}
+                            disabled={openingEvidence}
                         >
-                            <FileText size={20} color="#6366F1" />
-                            <Text style={styles.attachmentLabel}>{t('View Attached Receipt')}</Text>
+                            {openingEvidence ? (
+                                <ActivityIndicator size="small" color="#6366F1" />
+                            ) : (
+                                <FileText size={20} color="#6366F1" />
+                            )}
+                            <Text style={styles.attachmentLabel}>
+                                {openingEvidence ? t('Opening attached receipt...') : t('View Attached Receipt')}
+                            </Text>
                             <ChevronRight size={18} color="#94A3B8" />
                         </TouchableOpacity>
                     </Card>

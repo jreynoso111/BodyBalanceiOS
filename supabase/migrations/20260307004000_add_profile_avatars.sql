@@ -9,9 +9,6 @@ on conflict (id) do update
 set public = excluded.public;
 
 drop policy if exists avatars_select_authenticated on storage.objects;
-create policy avatars_select_authenticated on storage.objects
-for select to authenticated
-using (bucket_id = 'avatars');
 
 drop policy if exists avatars_insert_own on storage.objects;
 create policy avatars_insert_own on storage.objects
