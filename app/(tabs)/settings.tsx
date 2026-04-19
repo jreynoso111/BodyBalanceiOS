@@ -4,21 +4,22 @@ import { Link, Redirect } from 'expo-router';
 import { Text, View, Screen, Card } from '@/components/Themed';
 import { signOutLocalSession, supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
-import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles, Trash2 } from 'lucide-react-native';
+import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles } from 'lucide-react-native';
 import { exportLoansToCSV } from '@/services/exportService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { DEFAULT_USER_PREFERENCES, getOrCreateUserPreferences } from '@/services/userPreferences';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfileAvatarPublicUrl, isMissingAvatarUrlColumn } from '@/services/profileAvatar';
 import { getMembershipStatus, getPlanLabel, hasPremiumAccess, normalizePlanTier } from '@/services/subscriptionPlan';
-import { getDeviceLanguage } from '@/constants/i18n';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
+import { useI18n } from '@/hooks/useI18n';
 
 const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
 
 export default function SettingsScreen() {
-    const { user, role, planTier, initialized, setSession, setUser, setRole, setPlanTier, setLanguage } = useAuthStore();
+    const { user, role, planTier, initialized, setSession, setUser, setRole, setPlanTier } = useAuthStore();
+    const { t } = useI18n();
     const router = useRouter();
     const [prefs, setPrefs] = React.useState(DEFAULT_USER_PREFERENCES);
     const [profileName, setProfileName] = React.useState('');
@@ -100,7 +101,6 @@ export default function SettingsScreen() {
             setUser(null);
             setRole(null);
             setPlanTier('free');
-            setLanguage(getDeviceLanguage());
             navigateToLanding();
         } catch (error: any) {
             try {
@@ -109,10 +109,9 @@ export default function SettingsScreen() {
                 setUser(null);
                 setRole(null);
                 setPlanTier('free');
-                setLanguage(getDeviceLanguage());
                 navigateToLanding();
             } catch {
-                Alert.alert('Error', error?.message || 'Could not sign out right now.');
+                Alert.alert(t('Error'), error?.message || t('Could not sign out right now.'));
             }
         } finally {
             setSigningOut(false);
@@ -121,7 +120,7 @@ export default function SettingsScreen() {
 
     const handleExport = async () => {
         if (!hasPremiumAccess(planTier, { trialStartedAt: user?.created_at })) {
-            Alert.alert('Membership required', 'CSV export is available during the 21-day free trial or with Premium.');
+            Alert.alert(t('Membership required'), t('CSV export is available during the 21-day free trial or with Premium.'));
             return;
         }
 
@@ -142,25 +141,26 @@ export default function SettingsScreen() {
 
     const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
     const hasPaidOrTrialAccess = membershipStatus !== 'free';
+    const localizedPlanLabel = t(getPlanLabel(planTier, { trialStartedAt: user?.created_at }));
 
     const menuItems = [
         {
             icon: Sparkles,
-            label: membershipStatus === 'premium' ? 'Manage Premium' : membershipStatus === 'trial' ? 'Manage Trial' : 'Start Premium',
-            sub: membershipStatus === 'premium' ? 'Annual membership active' : membershipStatus === 'trial' ? '21-day free trial active' : 'Your 21-day free trial has ended',
+            label: t(membershipStatus === 'premium' ? 'Manage Premium' : membershipStatus === 'trial' ? 'Manage Trial' : 'Start Premium'),
+            sub: t(membershipStatus === 'premium' ? 'Annual membership active' : membershipStatus === 'trial' ? '21-day free trial active' : 'Your 21-day free trial has ended'),
             onPress: () => router.push('/subscription' as any),
         },
-        { icon: User, label: 'Profile', sub: user?.email, onPress: () => router.push('/profile') },
-        { icon: Bell, label: 'Notifications', sub: prefs.push_enabled ? 'Enabled' : 'Disabled', onPress: () => router.push('/notifications') },
-        { icon: Shield, label: 'Security', sub: prefs.biometric_enabled ? 'Biometric On' : 'Biometric Off', onPress: () => router.push('/security') },
-        { icon: CircleHelp, label: 'Help & Support', sub: 'FAQ & guidance', onPress: () => router.push('/help-support') },
+        { icon: User, label: t('Profile'), sub: user?.email, onPress: () => router.push('/profile') },
+        { icon: Bell, label: t('Notifications'), sub: t(prefs.push_enabled ? 'Enabled' : 'Disabled'), onPress: () => router.push('/notifications') },
+        { icon: Shield, label: t('Security'), sub: t(prefs.biometric_enabled ? 'Biometric On' : 'Biometric Off'), onPress: () => router.push('/security') },
+        { icon: CircleHelp, label: t('Help & Support'), sub: t('FAQ & guidance'), onPress: () => router.push('/help-support') },
     ];
 
     if (hasPaidOrTrialAccess) {
         menuItems.splice(4, 0, {
             icon: FileOutput,
-            label: 'Export Data (CSV)',
-            sub: membershipStatus === 'trial' ? 'Included during trial' : 'Share report',
+            label: t('Export Data (CSV)'),
+            sub: t(membershipStatus === 'trial' ? 'Included during trial' : 'Share report'),
             onPress: handleExport,
         });
     }
@@ -168,8 +168,8 @@ export default function SettingsScreen() {
     if (hasAdminAccess) {
         menuItems.unshift({
             icon: Shield,
-            label: 'Admin Dashboard',
-            sub: 'Manage users and platform data',
+            label: t('Admin Dashboard'),
+            sub: t('Manage users and platform data'),
             onPress: () => router.push('/admin' as any),
         });
     }
@@ -183,9 +183,9 @@ export default function SettingsScreen() {
 
         return (
             <WebAccountLayout
-                eyebrow="Account Center"
-                title="Manage the same Buddy Balance account you use in the app."
-                description="This web area gives you a cleaner desktop surface for profile management, membership status, security controls, notifications, exports, and support."
+                eyebrow={t('Account Center')}
+                title={t('Manage the same Buddy Balance account you use in the app.')}
+                description={t('This web area gives you a cleaner desktop surface for profile management, membership status, security controls, notifications, exports, and support.')}
             >
                 <View style={styles.webGrid}>
                     <Card style={styles.webSummaryCard}>
@@ -198,53 +198,53 @@ export default function SettingsScreen() {
                                 )}
                             </RNView>
                             <RNView style={styles.webSummaryCopy}>
-                                <Text style={styles.webSummaryName}>{profileName || 'Buddy Balance account'}</Text>
+                                <Text style={styles.webSummaryName}>{profileName || t('Buddy Balance account')}</Text>
                                 <Text style={styles.webSummaryEmail}>{user?.email}</Text>
-                                <Text style={styles.webSummaryMeta}>{getPlanLabel(planTier, { trialStartedAt: user?.created_at })} plan{hasAdminAccess ? ' • Admin access' : ''}</Text>
+                                <Text style={styles.webSummaryMeta}>{localizedPlanLabel} {t('plan')}{hasAdminAccess ? ` • ${t('Admin access')}` : ''}</Text>
                             </RNView>
                         </RNView>
                         <Text style={styles.webSummaryText}>
-                            Use Profile to edit identity details, Membership to review Premium access, Notifications to tune alerts, and Security to control biometrics and password changes.
+                            {t('Use Profile to edit identity details, Membership to review Premium access, Notifications to tune alerts, and Security to control biometrics and password changes.')}
                         </Text>
                     </Card>
 
                     <Card style={styles.webActionCard}>
-                        <Text style={styles.webCardTitle}>Account management</Text>
+                        <Text style={styles.webCardTitle}>{t('Account management')}</Text>
                         <RNView style={styles.webLinkStack}>
-                            <Link href="/dashboard" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>Dashboard overview</Text></Pressable></Link>
-                            <Link href="/profile" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>Edit profile</Text></Pressable></Link>
-                            <Link href="/subscription" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>View membership</Text></Pressable></Link>
-                            <Link href="/notifications" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>Notification settings</Text></Pressable></Link>
-                            <Link href="/security" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>Security settings</Text></Pressable></Link>
-                            <Link href="/help-support" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>Support and policies</Text></Pressable></Link>
+                            <Link href="/dashboard" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Dashboard overview')}</Text></Pressable></Link>
+                            <Link href="/profile" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Edit profile')}</Text></Pressable></Link>
+                            <Link href="/subscription" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('View membership')}</Text></Pressable></Link>
+                            <Link href="/notifications" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Notification settings')}</Text></Pressable></Link>
+                            <Link href="/security" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Security settings')}</Text></Pressable></Link>
+                            <Link href="/help-support" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Support and policies')}</Text></Pressable></Link>
                         </RNView>
                     </Card>
                 </View>
 
                 <View style={styles.webGrid}>
                     <Card style={styles.webStatusCard}>
-                        <Text style={styles.webCardTitle}>Current status</Text>
-                        <Text style={styles.webStatusLine}>Plan: {getPlanLabel(planTier, { trialStartedAt: user?.created_at })}</Text>
-                        <Text style={styles.webStatusLine}>Push alerts: {prefs.push_enabled ? 'Enabled' : 'Disabled'}</Text>
-                        <Text style={styles.webStatusLine}>Biometric lock: {prefs.biometric_enabled ? 'Enabled' : 'Disabled'}</Text>
-                        <Text style={styles.webStatusLine}>Marketing updates: {prefs.marketing_enabled ? 'Enabled' : 'Disabled'}</Text>
+                        <Text style={styles.webCardTitle}>{t('Current status')}</Text>
+                        <Text style={styles.webStatusLine}>{t('Plan')}: {localizedPlanLabel}</Text>
+                        <Text style={styles.webStatusLine}>{t('Push alerts')}: {t(prefs.push_enabled ? 'Enabled' : 'Disabled')}</Text>
+                        <Text style={styles.webStatusLine}>{t('Biometric lock')}: {t(prefs.biometric_enabled ? 'Enabled' : 'Disabled')}</Text>
+                        <Text style={styles.webStatusLine}>{t('Marketing updates')}: {t(prefs.marketing_enabled ? 'Enabled' : 'Disabled')}</Text>
                     </Card>
 
                     <Card style={styles.webStatusCard}>
-                        <Text style={styles.webCardTitle}>Quick actions</Text>
+                        <Text style={styles.webCardTitle}>{t('Quick actions')}</Text>
                         {hasPaidOrTrialAccess ? (
                             <TouchableOpacity style={styles.webPrimaryButton} onPress={handleExport}>
-                                <Text style={styles.webPrimaryButtonText}>{membershipStatus === 'trial' ? 'Export CSV (trial)' : 'Export CSV'}</Text>
+                                <Text style={styles.webPrimaryButtonText}>{t(membershipStatus === 'trial' ? 'Export CSV (trial)' : 'Export CSV')}</Text>
                             </TouchableOpacity>
                         ) : (
                             <Link href="/subscription" asChild>
                                 <Pressable style={styles.webPrimaryButton}>
-                                    <Text style={styles.webPrimaryButtonText}>See Premium options</Text>
+                                    <Text style={styles.webPrimaryButtonText}>{t('See Premium options')}</Text>
                                 </Pressable>
                             </Link>
                         )}
                         <TouchableOpacity style={styles.webSecondaryButton} onPress={handleSignOut} disabled={signingOut}>
-                            <Text style={styles.webSecondaryButtonText}>{signingOut ? 'Signing out...' : 'Sign out'}</Text>
+                            <Text style={styles.webSecondaryButtonText}>{signingOut ? t('Signing out...') : t('Sign out')}</Text>
                         </TouchableOpacity>
                     </Card>
                 </View>
@@ -270,7 +270,7 @@ export default function SettingsScreen() {
                     </RNView>
                     {profileName ? <Text style={styles.profileName}>{profileName}</Text> : null}
                     <Text style={styles.profileEmail}>{user?.email}</Text>
-                    <Text style={styles.profileSub}>{getPlanLabel(planTier, { trialStartedAt: user?.created_at })} Plan • {hasAdminAccess ? 'Admin' : 'User'}</Text>
+                    <Text style={styles.profileSub}>{localizedPlanLabel} {t('Plan')} • {t(hasAdminAccess ? 'Admin' : 'User')}</Text>
                 </View>
 
                 <Card style={styles.menuCard}>
@@ -305,7 +305,7 @@ export default function SettingsScreen() {
 
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} disabled={signingOut}>
                     <LogOut size={20} color="#EF4444" />
-                    <Text style={styles.signOutText}>{signingOut ? 'Signing Out...' : 'Sign Out'}</Text>
+                    <Text style={styles.signOutText}>{signingOut ? t('Signing out...') : t('Sign out')}</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.version}>Buddy Balance v1.0.0</Text>

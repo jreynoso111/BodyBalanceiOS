@@ -12,6 +12,7 @@ import { getOrCreateUserPreferences, sanitizePreferredCurrencies, updateUserPref
 import { cancelLoanReminders, upsertLoanReminderForUser } from '@/services/notificationService';
 import { shareLoanAsPdf } from '@/services/exportService';
 import { hasPremiumAccess } from '@/services/subscriptionPlan';
+import { useI18n } from '@/hooks/useI18n';
 
 const isMissingRequestPayloadColumn = (message?: string) =>
     String(message || '').toLowerCase().includes('request_payload');
@@ -22,6 +23,7 @@ export default function LoanDetailScreen() {
     const router = useRouter();
     const navigation = useNavigation();
     const { user, planTier } = useAuthStore();
+    const { t } = useI18n();
     const [loan, setLoan] = useState<any>(null);
     const [payments, setPayments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -59,6 +61,33 @@ export default function LoanDetailScreen() {
         void loadCurrencyPreferences();
     }, [user?.id]);
 
+    const getReminderFrequencyKey = (value?: string | null) => {
+        const normalized = String(value || '').trim().toLowerCase();
+
+        switch (normalized) {
+            case 'daily':
+                return 'Daily';
+            case 'weekly':
+                return 'Weekly';
+            case 'monthly':
+                return 'Monthly';
+            case 'yearly':
+                return 'Yearly';
+            case 'custom':
+                return 'Custom';
+            default:
+                return 'None';
+        }
+    };
+
+    const getReminderFrequencyLabel = (value?: string | null, interval?: string | number | null) => {
+        if (String(value || '').trim().toLowerCase() === 'custom') {
+            return t('Every {count} days', { count: interval || 1 });
+        }
+
+        return t(getReminderFrequencyKey(value));
+    };
+
     const goToHome = () => {
         navigation.dispatch(
             CommonActions.reset({
@@ -91,9 +120,9 @@ export default function LoanDetailScreen() {
             title,
             message,
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('Cancel'), style: 'cancel' },
                 {
-                    text: 'Confirm',
+                    text: t('Confirm'),
                     onPress: () => {
                         void onConfirm();
                     },
@@ -113,7 +142,7 @@ export default function LoanDetailScreen() {
             .maybeSingle();
 
         if (loanError || !loanData) {
-            Alert.alert('Error', loanError?.message || 'Record not found');
+            Alert.alert(t('Error'), loanError?.message || t('Record not found'));
             goToHome();
             setLoading(false);
             return;
@@ -168,7 +197,7 @@ export default function LoanDetailScreen() {
 
     const openAddCurrencyPicker = () => {
         if (addableCurrencies.length === 0) {
-            Alert.alert('Info', 'All available currencies are already enabled.');
+            Alert.alert(t('Info'), t('All available currencies are already enabled.'));
             return;
         }
         setCurrencyPickerVisible(true);
@@ -183,7 +212,7 @@ export default function LoanDetailScreen() {
         if (!user?.id) return;
         const { error } = await updateUserPreferences(user.id, { preferred_currencies: next });
         if (error) {
-            Alert.alert('Error', error.message);
+            Alert.alert(t('Error'), error.message);
             await loadCurrencyPreferences();
         }
     };
@@ -218,7 +247,7 @@ export default function LoanDetailScreen() {
 
     const submitReductionRequest = async () => {
         if (!loan?.id || !user?.id || !loan?.target_user_id) {
-            Alert.alert('Error', 'This request is unavailable right now.');
+            Alert.alert(t('Error'), t('This request is unavailable right now.'));
             return;
         }
 
@@ -226,22 +255,22 @@ export default function LoanDetailScreen() {
         const normalizedReason = reductionReason.trim();
 
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-            Alert.alert('Error', 'Enter a valid new total.');
+            Alert.alert(t('Error'), t('Enter a valid new total.'));
             return;
         }
 
         if (!normalizedReason) {
-            Alert.alert('Error', 'Please add a short note so the other person has context.');
+            Alert.alert(t('Error'), t('Please add a short note so the other person has context.'));
             return;
         }
 
         if (parsedAmount === safeLoanAmount) {
-            Alert.alert('Error', 'Enter a different total than the current one.');
+            Alert.alert(t('Error'), t('Enter a different total than the current one.'));
             return;
         }
 
         if (parsedAmount < totalPaid) {
-            Alert.alert('Error', 'The new total cannot be lower than what is already marked as paid.');
+            Alert.alert(t('Error'), t('The new total cannot be lower than what is already marked as paid.'));
             return;
         }
 
@@ -282,12 +311,12 @@ export default function LoanDetailScreen() {
             }
 
             if (error) {
-                Alert.alert('Error', error.message);
+                Alert.alert(t('Error'), error.message);
                 return;
             }
 
             closeReductionModal(true);
-            Alert.alert('Sent', 'Your suggestion has been shared.');
+            Alert.alert(t('Sent'), t('Your suggestion has been shared.'));
         } finally {
             setSendingReductionRequest(false);
         }
@@ -295,23 +324,23 @@ export default function LoanDetailScreen() {
 
     const submitAdjustedTotal = async () => {
         if (!loanId || !loan || !user?.id) {
-            Alert.alert('Error', 'Record not found');
+            Alert.alert(t('Error'), t('Record not found'));
             return;
         }
 
         const parsedAmount = Number.parseFloat(adjustedTotal);
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-            Alert.alert('Error', 'Please enter a valid total.');
+            Alert.alert(t('Error'), t('Please enter a valid total.'));
             return;
         }
 
         if (parsedAmount === safeLoanAmount) {
-            Alert.alert('Info', 'The total is already set to that amount.');
+            Alert.alert(t('Info'), t('The total is already set to that amount.'));
             return;
         }
 
         if (parsedAmount < totalPaid) {
-            Alert.alert('Error', 'The total cannot be lower than the amount already marked as paid.');
+            Alert.alert(t('Error'), t('The total cannot be lower than the amount already marked as paid.'));
             return;
         }
 
@@ -325,7 +354,7 @@ export default function LoanDetailScreen() {
                 .is('deleted_at', null);
 
             if (error) {
-                Alert.alert('Error', error.message);
+                Alert.alert(t('Error'), error.message);
                 return;
             }
 
@@ -336,7 +365,7 @@ export default function LoanDetailScreen() {
 
             await syncLoanStatus(updatedLoanContext);
             closeAdjustmentModal(true);
-            Alert.alert('Success', 'Total updated');
+            Alert.alert(t('Success'), t('Total updated'));
             await fetchLoanDetails();
         } finally {
             setSavingAdjustedTotal(false);
@@ -427,18 +456,18 @@ export default function LoanDetailScreen() {
         if (loan?.category === 'money') {
             const parsedAmount = parseFloat(editAmount);
             if (!editAmount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-                Alert.alert('Error', 'Please enter a valid amount');
+                Alert.alert(t('Error'), t('Please enter a valid amount'));
                 return;
             }
         }
 
         if (loan?.category === 'item' && !editItemName.trim()) {
-            Alert.alert('Error', 'Item name is required');
+            Alert.alert(t('Error'), t('Item name is required'));
             return;
         }
 
         if (editDueDate && Number.isNaN(new Date(editDueDate).getTime())) {
-            Alert.alert('Error', 'Due date must be a valid date (YYYY-MM-DD)');
+            Alert.alert(t('Error'), t('Due date must be a valid date (YYYY-MM-DD).'));
             return;
         }
 
@@ -465,9 +494,9 @@ export default function LoanDetailScreen() {
             .select('id');
 
         if (error) {
-            Alert.alert('Error', error.message);
+            Alert.alert(t('Error'), error.message);
         } else if (!data || data.length === 0) {
-            Alert.alert('Error', 'Record could not be updated');
+            Alert.alert(t('Error'), t('Record could not be updated'));
         } else {
             const updatedLoanContext = {
                 ...loan,
@@ -478,7 +507,7 @@ export default function LoanDetailScreen() {
             };
 
             await syncLoanStatus(updatedLoanContext);
-            Alert.alert('Success', 'Record updated');
+            Alert.alert(t('Success'), t('Record updated'));
             setIsEditing(false);
             fetchLoanDetails();
         }
@@ -491,8 +520,8 @@ export default function LoanDetailScreen() {
         }
 
         confirmAction(
-            'Delete Payment',
-            'Are you sure you want to delete this payment? This action cannot be undone.',
+            t('Delete Payment'),
+            t('Are you sure you want to delete this payment? This action cannot be undone.'),
             async () => {
                 const { error } = await supabase
                     .from('payments')
@@ -501,13 +530,13 @@ export default function LoanDetailScreen() {
                     .eq('loan_id', loanId);
 
                 if (error) {
-                    Alert.alert('Error', error.message);
+                    Alert.alert(t('Error'), error.message);
                     return;
                 }
 
                 await syncLoanStatus();
                 await fetchLoanDetails();
-                Alert.alert('Success', 'Payment deleted');
+                Alert.alert(t('Success'), t('Payment deleted'));
             }
         );
     };
@@ -519,8 +548,8 @@ export default function LoanDetailScreen() {
         }
 
         confirmAction(
-            'Delete Record',
-            'Are you sure you want to delete this record? This action is undoable only by contact supports.',
+            t('Delete Record'),
+            t('Are you sure you want to delete this record? This action is undoable only by contact supports.'),
             async () => {
                 await confirmDelete();
             }
@@ -544,7 +573,7 @@ export default function LoanDetailScreen() {
 
             if (!hardDeleteError && (count ?? 0) > 0) {
                 await cancelLoanReminders(String(loanId));
-                Alert.alert('Success', 'Record deleted');
+                Alert.alert(t('Success'), t('Record deleted'));
                 router.replace('/(tabs)');
                 return;
             }
@@ -557,20 +586,20 @@ export default function LoanDetailScreen() {
                 .select('id');
 
             if (error) {
-                Alert.alert('Error', error.message);
+                Alert.alert(t('Error'), error.message);
                 return;
             }
 
             if (!data || data.length === 0) {
-                Alert.alert('Error', 'Record could not be deleted');
+                Alert.alert(t('Error'), t('Record could not be deleted'));
                 return;
             }
 
             await cancelLoanReminders(String(loanId));
-            Alert.alert('Success', 'Record deleted');
+            Alert.alert(t('Success'), t('Record deleted'));
             router.replace('/(tabs)');
         } catch (error: any) {
-            Alert.alert('Error', error?.message || 'Unexpected error deleting record');
+            Alert.alert(t('Error'), error?.message || t('Unexpected error deleting record'));
         } finally {
             setLoading(false);
         }
@@ -584,7 +613,7 @@ export default function LoanDetailScreen() {
             .order('created_at', { ascending: false });
 
         if (error) {
-            Alert.alert('Error', 'Could not fetch history');
+            Alert.alert(t('Error'), t('Could not fetch history'));
         } else {
             setSelectedPaymentHistory(data || []);
             setHistoryModalVisible(true);
@@ -593,7 +622,7 @@ export default function LoanDetailScreen() {
 
     const handleSharePdf = async () => {
         if (!hasPremiumAccess(planTier, { trialStartedAt: user?.created_at })) {
-            Alert.alert('Membership required', 'PDF sharing is available during the 21-day free trial or with Premium.');
+            Alert.alert(t('Membership required'), t('PDF sharing is available during the 21-day free trial or with Premium.'));
             return;
         }
 
@@ -728,7 +757,7 @@ export default function LoanDetailScreen() {
                         <RNView style={styles.headerInfo}>
                             <Text style={styles.headerName}>{loan.contacts?.name}</Text>
                             <Text style={styles.headerSub}>
-                                {loan.category === 'item' ? 'Shared item' : (loan.type === 'lent' ? 'You shared money' : 'You received money')}
+                                {loan.category === 'item' ? t('Shared item') : (loan.type === 'lent' ? t('You shared money') : t('You received money'))}
                             </Text>
                             {canLinkContactAccount ? (
                                 <TouchableOpacity
@@ -745,14 +774,14 @@ export default function LoanDetailScreen() {
                                     }
                                 >
                                     <Text style={styles.linkContactButtonText}>
-                                        {contactLinkStatus === 'pending' ? 'Review friend link' : 'Link this contact to an account'}
+                                        {contactLinkStatus === 'pending' ? t('Review friend link') : t('Link this contact to an account')}
                                     </Text>
                                 </TouchableOpacity>
                             ) : null}
                         </RNView>
                     </RNView>
 
-                    <RNText style={styles.amountLabel}>Still open</RNText>
+                    <RNText style={styles.amountLabel}>{t('Still open')}</RNText>
                     <Text style={styles.amountText}>
                         {loan.category === 'item' ? loan.item_name : `${getCurrencySymbol(loan.currency)}${remaining.toLocaleString()}`}
                     </Text>
@@ -760,11 +789,11 @@ export default function LoanDetailScreen() {
                     {loan.category === 'money' && (
                         <RNView style={styles.balanceBreakdown}>
                             <RNView style={styles.breakdownItem}>
-                                <RNText style={styles.breakdownLabel}>Paid</RNText>
+                                <RNText style={styles.breakdownLabel}>{t('Paid')}</RNText>
                                 <Text style={styles.breakdownValue}>{getCurrencySymbol(loan.currency)}{totalPaid.toLocaleString()}</Text>
                             </RNView>
                             <RNView style={[styles.breakdownItem, { alignItems: 'flex-end' }]}>
-                                <RNText style={styles.breakdownLabel}>Original Total</RNText>
+                                <RNText style={styles.breakdownLabel}>{t('Original Total')}</RNText>
                                 <Text style={styles.breakdownValue}>{getCurrencySymbol(loan.currency)}{safeLoanAmount.toLocaleString()}</Text>
                             </RNView>
                         </RNView>
@@ -773,7 +802,7 @@ export default function LoanDetailScreen() {
                     {loan.category === 'money' && (
                         <RNView style={styles.progressSection}>
                             <RNView style={styles.progressLabels}>
-                                <Text style={styles.progressLabel}>Progress</Text>
+                                <Text style={styles.progressLabel}>{t('Progress')}</Text>
                                 <Text style={styles.progressPercent}>{Math.round(paymentProgressClamped)}%</Text>
                             </RNView>
                             <RNView style={styles.progressBar}>
@@ -784,23 +813,23 @@ export default function LoanDetailScreen() {
                 </Card>
 
                 <Card style={styles.detailsCard}>
-                    <Text style={styles.sectionTitle}>Information</Text>
+                    <Text style={styles.sectionTitle}>{t('Information')}</Text>
                     <RNView style={styles.infoRow}>
                         <RNView style={styles.infoItem}>
                             <Calendar size={18} color="#94A3B8" />
-                            <Text style={styles.infoLabel}>Due Date</Text>
-                            <Text style={styles.infoValue}>{loan.due_date ? new Date(loan.due_date).toLocaleDateString() : 'No date'}</Text>
+                            <Text style={styles.infoLabel}>{t('Due Date')}</Text>
+                            <Text style={styles.infoValue}>{loan.due_date ? new Date(loan.due_date).toLocaleDateString() : t('No date')}</Text>
                         </RNView>
                         <RNView style={styles.infoItem}>
                             <Clock size={18} color="#94A3B8" />
-                            <Text style={styles.infoLabel}>Status</Text>
+                            <Text style={styles.infoLabel}>{t('Status')}</Text>
                             <Text style={[styles.infoValue, { textTransform: 'uppercase', color: loan.status === 'paid' ? '#10B981' : '#6366F1' }]}>{loan.status}</Text>
                         </RNView>
                     </RNView>
 
                     {!isEditing && (
                         <TouchableOpacity style={styles.saveNoteBtn} onPress={() => setIsEditing(true)}>
-                            <Text style={styles.saveNoteText}>Edit details</Text>
+                            <Text style={styles.saveNoteText}>{t('Edit details')}</Text>
                         </TouchableOpacity>
                     )}
 
@@ -808,7 +837,7 @@ export default function LoanDetailScreen() {
                         <RNView>
                             {loan.category === 'money' ? (
                                 <RNView>
-                                    <Text style={styles.label}>Currency</Text>
+                                    <Text style={styles.label}>{t('Currency')}</Text>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencySelector}>
                                         {availableCurrencies.map((code) => (
                                             <TouchableOpacity
@@ -823,11 +852,11 @@ export default function LoanDetailScreen() {
                                         ))}
                                         <TouchableOpacity style={styles.currencyAddChip} onPress={openAddCurrencyPicker}>
                                             <Plus size={14} color="#475569" />
-                                            <Text style={styles.currencyAddChipText}>Add</Text>
+                                            <Text style={styles.currencyAddChipText}>{t('Add')}</Text>
                                         </TouchableOpacity>
                                     </ScrollView>
 
-                                    <Text style={styles.label}>Amount</Text>
+                                    <Text style={styles.label}>{t('Amount')}</Text>
                                     <TextInput
                                         placeholder="0.00"
                                         placeholderTextColor="#94A3B8"
@@ -839,9 +868,9 @@ export default function LoanDetailScreen() {
                                 </RNView>
                             ) : (
                                 <RNView>
-                                    <Text style={styles.label}>Item Name</Text>
+                                    <Text style={styles.label}>{t('Item Name')}</Text>
                                     <TextInput
-                                        placeholder="Item name"
+                                        placeholder={t('Item name')}
                                         placeholderTextColor="#94A3B8"
                                         value={editItemName}
                                         onChangeText={setEditItemName}
@@ -850,9 +879,9 @@ export default function LoanDetailScreen() {
                                 </RNView>
                             )}
 
-                            <Text style={styles.label}>Due Date</Text>
+                            <Text style={styles.label}>{t('Due Date')}</Text>
                             <TextInput
-                                placeholder="YYYY-MM-DD"
+                                placeholder={t('YYYY-MM-DD')}
                                 placeholderTextColor="#94A3B8"
                                 value={editDueDate}
                                 onChangeText={setEditDueDate}
@@ -861,7 +890,7 @@ export default function LoanDetailScreen() {
                         </RNView>
                     )}
 
-                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Description</Text>
+                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('Description')}</Text>
                     {isEditing ? (
                         <RNView style={styles.editWrapper}>
                             <TextInput
@@ -869,26 +898,26 @@ export default function LoanDetailScreen() {
                                 value={note}
                                 onChangeText={setNote}
                                 multiline
-                                placeholder="Add a description..."
+                                placeholder={t('Add a description...')}
                                 placeholderTextColor="#94A3B8"
                             />
                             <TouchableOpacity style={styles.saveNoteBtn} onPress={handleUpdate}>
-                                <Text style={styles.saveNoteText}>Save Changes</Text>
+                                <Text style={styles.saveNoteText}>{t('Save Changes')}</Text>
                             </TouchableOpacity>
                         </RNView>
                     ) : (
                         <TouchableOpacity style={styles.descriptionBox} onPress={() => setIsEditing(true)}>
                             <Text style={styles.descriptionText}>
-                                {loan.description || 'No description provided. Tap to add one.'}
+                                {loan.description || t('No description provided. Tap to add one.')}
                             </Text>
                             <Edit size={16} color="#94A3B8" />
                         </TouchableOpacity>
                     )}
 
-                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Reminders</Text>
+                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('Reminders')}</Text>
                     {isEditing ? (
                         <RNView>
-                            <Text style={styles.label}>Frequency</Text>
+                            <Text style={styles.label}>{t('Frequency')}</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencySelector}>
                                 {['none', 'daily', 'weekly', 'custom', 'monthly', 'yearly'].map((f) => (
                                     <TouchableOpacity
@@ -897,14 +926,14 @@ export default function LoanDetailScreen() {
                                         style={[styles.currencyChip, reminderFrequency === f && styles.currencyChipActive]}
                                     >
                                         <Text style={[styles.currencyChipText, reminderFrequency === f && styles.currencyChipTextActive]}>
-                                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                                            {getReminderFrequencyLabel(f)}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
                             {reminderFrequency === 'custom' && (
                                 <RNView>
-                                    <Text style={styles.label}>Every X days</Text>
+                                    <Text style={styles.label}>{t('Every X days')}</Text>
                                     <TextInput
                                         placeholder="e.g. 3"
                                         placeholderTextColor="#94A3B8"
@@ -920,11 +949,9 @@ export default function LoanDetailScreen() {
                         <RNView style={styles.infoRow}>
                             <RNView style={styles.infoItem}>
                                 <Bell size={18} color="#94A3B8" />
-                                <Text style={styles.infoLabel}>Frequency</Text>
+                                <Text style={styles.infoLabel}>{t('Frequency')}</Text>
                                 <Text style={styles.infoValue}>
-                                    {loan.reminder_frequency === 'custom'
-                                        ? `Every ${loan.reminder_interval} days`
-                                        : (loan.reminder_frequency?.charAt(0).toUpperCase() + loan.reminder_frequency?.slice(1) || 'None')}
+                                    {getReminderFrequencyLabel(loan.reminder_frequency, loan.reminder_interval)}
                                 </Text>
                             </RNView>
                         </RNView>
@@ -933,16 +960,16 @@ export default function LoanDetailScreen() {
 
                 {loan.evidence_url && (
                     <Card style={styles.evidenceCard}>
-                        <Text style={styles.sectionTitle}>Evidence</Text>
+                        <Text style={styles.sectionTitle}>{t('Evidence')}</Text>
                         <TouchableOpacity
                             style={styles.attachmentButton}
                             onPress={() => {
                                 const { data } = supabase.storage.from('receipts').getPublicUrl(loan.evidence_url);
-                                Alert.alert('Attachment', 'Opening secure receipt view...');
+                                Alert.alert(t('Attachment'), t('Opening secure receipt view...'));
                             }}
                         >
                             <FileText size={20} color="#6366F1" />
-                            <Text style={styles.attachmentLabel}>View Attached Receipt</Text>
+                            <Text style={styles.attachmentLabel}>{t('View Attached Receipt')}</Text>
                             <ChevronRight size={18} color="#94A3B8" />
                         </TouchableOpacity>
                     </Card>
@@ -950,15 +977,15 @@ export default function LoanDetailScreen() {
 
                 {loan.category === 'money' && (
                     <RNView style={styles.analyticsSection}>
-                        <Text style={styles.sectionTitle}>Record insights</Text>
+                        <Text style={styles.sectionTitle}>{t('Record insights')}</Text>
                         <RNView style={styles.analyticsGrid}>
                             <Card style={styles.analyticsCard}>
                                 <RNView style={[styles.analyticsIcon, { backgroundColor: health === 'ahead' ? 'rgba(16, 185, 129, 0.1)' : health === 'behind' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 102, 241, 0.1)' }]}>
                                     {health === 'ahead' ? <ShieldCheck size={20} color="#10B981" /> : health === 'behind' ? <ShieldAlert size={20} color="#EF4444" /> : <Shield size={20} color="#6366F1" />}
                                 </RNView>
-                                <Text style={styles.analyticsLabel}>Pace</Text>
+                                <Text style={styles.analyticsLabel}>{t('Pace')}</Text>
                                 <Text style={[styles.analyticsValue, { color: health === 'ahead' ? '#10B981' : health === 'behind' ? '#EF4444' : '#6366F1' }]}>
-                                    {health === 'ahead' ? 'Ahead' : health === 'behind' ? 'Needs attention' : 'On track'}
+                                    {health === 'ahead' ? t('Ahead') : health === 'behind' ? t('Needs attention') : t('On track')}
                                 </Text>
                             </Card>
 
@@ -966,7 +993,7 @@ export default function LoanDetailScreen() {
                                 <RNView style={[styles.analyticsIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
                                     <Zap size={20} color="#F59E0B" />
                                 </RNView>
-                                <Text style={styles.analyticsLabel}>Average payment</Text>
+                                <Text style={styles.analyticsLabel}>{t('Average payment')}</Text>
                                 <Text style={styles.analyticsValue}>{getCurrencySymbol(loan.currency)}{Math.round(avgPayment).toLocaleString()}/entry</Text>
                             </Card>
                         </RNView>
@@ -974,39 +1001,39 @@ export default function LoanDetailScreen() {
                         <Card style={styles.efficiencyCard}>
                             <RNView style={styles.efficiencyHeader}>
                                 <TrendingUp size={18} color="#6366F1" />
-                                <Text style={styles.efficiencyTitle}>How it's going</Text>
+                                <Text style={styles.efficiencyTitle}>{t("How it's going")}</Text>
                             </RNView>
                             <Text style={styles.efficiencyDesc}>
                                 {health === 'ahead'
-                                    ? "This record is moving faster than expected."
+                                    ? t('This record is moving faster than expected.')
                                     : health === 'behind'
-                                        ? "This one is moving slower than expected. A quick follow-up may help."
-                                        : "Everything looks steady so far."}
+                                        ? t('This one is moving slower than expected. A quick follow-up may help.')
+                                        : t('Everything looks steady so far.')}
                             </Text>
                         </Card>
                     </RNView>
                 )}
 
                 <RNView style={styles.timelineSection}>
-                    <Text style={styles.sectionTitle}>{loan.category === 'money' ? 'Payments & history' : 'Activity history'}</Text>
+                    <Text style={styles.sectionTitle}>{loan.category === 'money' ? t('Payments & history') : t('Activity history')}</Text>
                     <RNView style={styles.timelineContainer}>
                         <RNView style={styles.timelineLine} />
                         <RNView style={styles.timelineItem}>
                             <RNView style={[styles.timelineDot, { backgroundColor: '#CBD5E1' }]} />
                             <RNView style={styles.timelineContent}>
-                                <Text style={styles.timelineTitle}>Record created</Text>
+                                <Text style={styles.timelineTitle}>{t('Record created')}</Text>
                                 <Text style={styles.timelineDate}>{new Date(loan.created_at).toLocaleDateString()}</Text>
                             </RNView>
                         </RNView>
 
                         {payments.length === 0 && loan.category === 'money' ? (
                             <Card style={styles.emptyTimelineCard}>
-                                <Text style={styles.emptyTimelineTitle}>No payments logged yet</Text>
+                                <Text style={styles.emptyTimelineTitle}>{t('No payments logged yet')}</Text>
                                 <Text style={styles.emptyTimelineText}>
-                                    Add the first payment here so the record keeps a clear history.
+                                    {t('Add the first payment here so the record keeps a clear history.')}
                                 </Text>
                                 <TouchableOpacity style={styles.emptyTimelineButton} onPress={() => openPaymentForm()}>
-                                    <Text style={styles.emptyTimelineButtonText}>Add payment</Text>
+                                    <Text style={styles.emptyTimelineButtonText}>{t('Add payment')}</Text>
                                 </TouchableOpacity>
                             </Card>
                         ) : null}

@@ -9,7 +9,6 @@ import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { deleteMyAccount } from '@/services/accountManagement';
 import { clearPersistedAuthState, supabase } from '@/services/supabase';
-import { getDeviceLanguage } from '@/constants/i18n';
 import { useAuthStore } from '@/store/authStore';
 
 const CONFIRMATION_TEXT = 'DELETE';
@@ -18,7 +17,7 @@ const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
 export default function DeleteAccountScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
-  const { initialized, user, setSession, setUser, setRole, setPlanTier, setLanguage } = useAuthStore();
+  const { initialized, user, setSession, setUser, setRole, setPlanTier } = useAuthStore();
   const [confirmation, setConfirmation] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [feedback, setFeedback] = React.useState<string | null>(null);
@@ -46,7 +45,6 @@ export default function DeleteAccountScreen() {
     setUser(null);
     setRole(null);
     setPlanTier('free');
-    setLanguage(getDeviceLanguage());
   };
 
   const handleDeleteAccount = async () => {

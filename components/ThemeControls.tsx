@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { APP_PALETTES, AppPaletteName } from '@/constants/AppTheme';
+import { useI18n } from '@/hooks/useI18n';
 import { usePaletteStore } from '@/store/paletteStore';
 import { useAuthStore } from '@/store/authStore';
 import { ThemePreference, useThemeStore } from '@/store/themeStore';
@@ -22,6 +23,7 @@ export function ThemePreferencePicker({
   description?: string;
 }) {
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
   const preference = useThemeStore((state) => state.preference);
   const setThemePreference = useThemeStore((state) => state.setThemePreference);
   const userId = useAuthStore((state) => state.user?.id);
@@ -29,8 +31,8 @@ export function ThemePreferencePicker({
 
   return (
     <View style={styles.pickerBlock}>
-      <Text style={[styles.pickerTitle, isDark && styles.pickerTitleDark]}>{title}</Text>
-      <Text style={[styles.pickerDescription, isDark && styles.pickerDescriptionDark]}>{description}</Text>
+      <Text style={[styles.pickerTitle, isDark && styles.pickerTitleDark]}>{t(title)}</Text>
+      <Text style={[styles.pickerDescription, isDark && styles.pickerDescriptionDark]}>{t(description)}</Text>
 
       <View style={[styles.pickerRow, isDark && styles.pickerRowDark]}>
         {THEME_OPTIONS.map((option) => {
@@ -54,7 +56,7 @@ export function ThemePreferencePicker({
                   active && styles.pickerOptionLabelActive,
                 ]}
               >
-                {option.label}
+                {t(option.label)}
               </Text>
             </Pressable>
           );
@@ -72,6 +74,7 @@ export function ColorPalettePicker({
   description?: string;
 }) {
   const colorScheme = useColorScheme();
+  const { t } = useI18n();
   const palette = usePaletteStore((state) => state.palette);
   const setPalettePreference = usePaletteStore((state) => state.setPalettePreference);
   const userId = useAuthStore((state) => state.user?.id);
@@ -79,8 +82,8 @@ export function ColorPalettePicker({
 
   return (
     <View style={styles.pickerBlock}>
-      <Text style={[styles.pickerTitle, isDark && styles.pickerTitleDark]}>{title}</Text>
-      <Text style={[styles.pickerDescription, isDark && styles.pickerDescriptionDark]}>{description}</Text>
+      <Text style={[styles.pickerTitle, isDark && styles.pickerTitleDark]}>{t(title)}</Text>
+      <Text style={[styles.pickerDescription, isDark && styles.pickerDescriptionDark]}>{t(description)}</Text>
 
       <View style={styles.paletteList}>
         {(Object.entries(APP_PALETTES) as Array<[AppPaletteName, (typeof APP_PALETTES)[AppPaletteName]]>).map(([key, value]) => {

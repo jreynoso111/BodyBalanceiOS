@@ -16,7 +16,7 @@ import {
   uploadProfileAvatar,
 } from '@/services/profileAvatar';
 import { applyInvitationCode, formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
-import { normalizePlanTier } from '@/services/subscriptionPlan';
+import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
 import { useAppTheme } from '@/hooks/useAppTheme';
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
 
     if (error) {
       console.error('profile load failed:', error.message);
-      Alert.alert('Error', error.message);
+      Alert.alert(t('Error'), error.message);
       setInitializing(false);
       return;
     }
@@ -185,7 +185,7 @@ export default function ProfileScreen() {
 
     const asset = result.assets[0];
     if (!asset.base64) {
-      Alert.alert('Error', 'Could not read the selected image.');
+      Alert.alert(t('Error'), t('Could not read the selected image.'));
       return;
     }
 
@@ -208,7 +208,7 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     if (!user?.id) {
-      Alert.alert('Error', 'User not found');
+      Alert.alert(t('Error'), t('User not found'));
       return;
     }
 
@@ -234,7 +234,7 @@ export default function ProfileScreen() {
         full_name: fullName.trim() || null,
         phone: phone.trim() || null,
         email: email.trim() || user.email || null,
-        currency_default: currencyDefault,
+        currency_default: String(currencyDefault || 'USD').trim().toUpperCase() || 'USD',
         default_language: defaultLanguage,
         avatar_url: nextAvatarPath,
         updated_at: new Date().toISOString(),
@@ -284,25 +284,27 @@ export default function ProfileScreen() {
       setAvatarMarkedForRemoval(false);
       setAvatarDirty(false);
 
-      const fallbackNotes = [];
+      const fallbackNotes: string[] = [];
       if (languageSavedWithFallback) {
         fallbackNotes.push('Default Language');
       }
       if (avatarSavedWithFallback) {
-        fallbackNotes.push('Profile Photo');
+        fallbackNotes.push('Profile photo');
       }
 
       Alert.alert(
-        'Success',
+        t('Success'),
         fallbackNotes.length > 0
-          ? `Profile updated. Run the latest Supabase migration to persist: ${fallbackNotes.join(', ')}.`
-          : 'Profile updated'
+          ? t('Profile updated. Run the latest Supabase migration to persist: {fields}.', {
+              fields: fallbackNotes.map((field) => t(field)).join(', '),
+            })
+          : t('Profile updated')
       );
     } catch (error: any) {
       if (uploadedAvatarPath) {
         await removeProfileAvatar(uploadedAvatarPath);
       }
-      Alert.alert('Error', error?.message || 'Could not update your profile.');
+      Alert.alert(t('Error'), error?.message || t('Could not update your profile.'));
     } finally {
       setLoading(false);
     }
@@ -310,28 +312,28 @@ export default function ProfileScreen() {
 
   const handleShareFriendCode = async () => {
     if (!friendCode) {
-      Alert.alert('Error', 'Friend code is not ready yet.');
+      Alert.alert(t('Error'), t('Friend code is not ready yet.'));
       return;
     }
 
     try {
       await Share.share({
-        message: `Join me on Buddy Balance and use my invite code ${friendCode}. Every 3 successful uses unlocks 1 month of Premium for me.`,
+        message: t('Join me on Buddy Balance and use my invite code {code}. Every 3 successful uses unlocks 1 month of Premium for me.', { code: friendCode }),
       });
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Could not open the share sheet.');
+      Alert.alert(t('Error'), error?.message || t('Could not open the share sheet.'));
     }
   };
 
   const handleApplyInviteCode = async () => {
     const normalizedCode = inviteCodeInput.trim().toUpperCase();
     if (!normalizedCode) {
-      Alert.alert('Invite code needed', 'Enter an invite code to redeem it.');
+      Alert.alert(t('Invite code needed'), t('Enter an invite code to redeem it.'));
       return;
     }
 
     if (normalizedCode === friendCode.trim().toUpperCase()) {
-      Alert.alert('Invalid invite code', 'You cannot use your own invite code.');
+      Alert.alert(t('Invalid invite code'), t('You cannot use your own invite code.'));
       return;
     }
 
@@ -344,13 +346,13 @@ export default function ProfileScreen() {
 
       await loadProfile();
       Alert.alert(
-        'Invite code applied',
+        t('Invite code applied'),
         data?.rewardMonths
-          ? 'This redemption completed a reward cycle for your friend. Your account is now linked to their invite.'
-          : 'The invite code was saved successfully.'
+          ? t('This redemption completed a reward cycle for your friend. Your account is now linked to their invite.')
+          : t('The invite code was saved successfully.')
       );
     } catch (error: any) {
-      Alert.alert('Could not apply invite code', error?.message || 'Try again in a moment.');
+      Alert.alert(t('Could not apply invite code'), error?.message || t('Try again in a moment.'));
     } finally {
       setApplyingInviteCode(false);
     }
@@ -358,6 +360,10 @@ export default function ProfileScreen() {
 
   const profileInitial = (fullName || email || user?.email || '?').trim().charAt(0).toUpperCase();
   const rewardExpiryLabel = formatReferralExpiry(inviteSummary?.premiumReferralExpiresAt);
+  const localizedPlanLabel = t(getPlanLabel(planTier, { trialStartedAt: user?.created_at }));
+  const referralCount = inviteSummary?.referralCount || 0;
+  const referralsUntilNextReward = inviteSummary?.referralsUntilNextReward || 3;
+  const inviteProgressPercent = Math.min(((referralCount % 3) || 0) / 3 * 100, 100);
 
   const handleRefresh = async () => {
     if (!user?.id) return;
@@ -376,9 +382,9 @@ export default function ProfileScreen() {
 
     return (
       <WebAccountLayout
-        eyebrow="Profile"
-        title="Edit identity, defaults, and invite settings."
-        description="These changes update the same Buddy Balance profile record used by the mobile app."
+        eyebrow={t('Profile')}
+        title={t('Edit identity, defaults, and invite settings.')}
+        description={t('These changes update the same Buddy Balance profile record used by the mobile app.')}
       >
         <Card style={styles.webProfileCard}>
           <RNView style={styles.webAvatarRow}>
@@ -392,16 +398,16 @@ export default function ProfileScreen() {
               )}
             </RNView>
             <RNView style={styles.webAvatarCopy}>
-              <Text style={styles.webCardTitle}>Profile photo</Text>
-              <Text style={styles.webCardBody}>Use the mobile app if you want to upload or crop a new avatar. Web focuses on account management and profile data.</Text>
+              <Text style={styles.webCardTitle}>{t('Profile photo')}</Text>
+              <Text style={styles.webCardBody}>{t('Use the mobile app if you want to upload or crop a new avatar. Web focuses on account management and profile data.')}</Text>
             </RNView>
           </RNView>
         </Card>
 
         <View style={styles.webGrid}>
           <Card style={styles.webFormCard}>
-            <Text style={styles.webCardTitle}>Identity</Text>
-            <Text style={styles.label}>Full Name</Text>
+            <Text style={styles.webCardTitle}>{t('Identity')}</Text>
+            <Text style={styles.label}>{t('Full Name')}</Text>
             <TextInput
               style={styles.input}
               placeholder={t('Your full name')}
@@ -410,7 +416,7 @@ export default function ProfileScreen() {
               onChangeText={setFullName}
             />
 
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('Email')}</Text>
             <TextInput
               style={styles.input}
               placeholder="email@example.com"
@@ -421,7 +427,7 @@ export default function ProfileScreen() {
               onChangeText={setEmail}
             />
 
-            <Text style={styles.label}>Phone</Text>
+            <Text style={styles.label}>{t('Phone')}</Text>
             <TextInput
               style={styles.input}
               placeholder="+1 555 555 5555"
@@ -431,7 +437,7 @@ export default function ProfileScreen() {
               onChangeText={setPhone}
             />
 
-            <Text style={styles.label}>Default Currency</Text>
+            <Text style={styles.label}>{t('Default Currency')}</Text>
             <TextInput
               style={styles.input}
               placeholder="USD"
@@ -440,35 +446,41 @@ export default function ProfileScreen() {
               onChangeText={setCurrencyDefault}
             />
 
-            <Text style={styles.label}>Default Language</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="en"
-              placeholderTextColor="#94A3B8"
-              value={defaultLanguage}
-              onChangeText={(value) => setDefaultLanguage(normalizeLanguage(value, getDeviceLanguage()))}
-            />
+            <Text style={styles.label}>{t('Default Language')}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
+              {SUPPORTED_LANGUAGES.map((language) => (
+                <TouchableOpacity
+                  key={language.code}
+                  style={[styles.chip, defaultLanguage === language.code && styles.chipActive]}
+                  onPress={() => setDefaultLanguage(language.code)}
+                >
+                  <Text style={[styles.chipText, defaultLanguage === language.code && styles.chipTextActive]}>
+                    {language.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
             <TouchableOpacity style={styles.webPrimaryButton} onPress={() => void handleSave()} disabled={loading || initializing}>
-              <Text style={styles.webPrimaryButtonText}>{loading ? 'Saving...' : 'Save profile'}</Text>
+              <Text style={styles.webPrimaryButtonText}>{loading ? t('Saving...') : t('Save Profile')}</Text>
             </TouchableOpacity>
           </Card>
 
           <Card style={styles.webInviteCard}>
-            <Text style={styles.webCardTitle}>Invite and referral</Text>
-            <Text style={styles.webCardBody}>Your invite code links new people to your Buddy Balance network and can unlock referral Premium time.</Text>
-            <Text selectable style={styles.webInviteCode}>{friendCode || 'Setting up...'}</Text>
+            <Text style={styles.webCardTitle}>{t('Invite and referral')}</Text>
+            <Text style={styles.webCardBody}>{t('Share this code with friends who are not in the app yet. Every 3 successful uses unlocks 1 month of Premium.')}</Text>
+            <Text selectable style={styles.webInviteCode}>{friendCode || t('Setting up...')}</Text>
             <TouchableOpacity
               style={[styles.webSecondaryButton, !friendCode && styles.webSecondaryButtonDisabled]}
               onPress={() => { void handleShareFriendCode(); }}
               disabled={!friendCode}
             >
-              <Text style={styles.webSecondaryButtonText}>Share code</Text>
+              <Text style={styles.webSecondaryButtonText}>{t('Share code')}</Text>
             </TouchableOpacity>
 
             <TextInput
               style={styles.input}
-              placeholder="Enter an invite code"
+              placeholder={t('Enter an invite code to redeem it.')}
               placeholderTextColor="#94A3B8"
               value={inviteCodeInput}
               onChangeText={setInviteCodeInput}
@@ -479,14 +491,14 @@ export default function ProfileScreen() {
               onPress={() => void handleApplyInviteCode()}
               disabled={applyingInviteCode}
             >
-              <Text style={styles.webPrimaryButtonText}>{applyingInviteCode ? 'Applying...' : 'Apply invite code'}</Text>
+              <Text style={styles.webPrimaryButtonText}>{applyingInviteCode ? t('Applying...') : t('Apply invite code')}</Text>
             </TouchableOpacity>
 
             {inviteSummary ? (
               <Text style={styles.webHintText}>
                 {rewardExpiryLabel
-                  ? `Referral Premium active until ${rewardExpiryLabel}.`
-                  : `${inviteSummary.referralCount}/3 successful invite uses earned toward the next free Premium month.`}
+                  ? t('Referral Premium active until {date}.', { date: rewardExpiryLabel })
+                  : t('{count}/3 uses toward your next Premium month', { count: inviteSummary.referralCount })}
               </Text>
             ) : null}
           </Card>
@@ -535,14 +547,14 @@ export default function ProfileScreen() {
             onPress={() => router.replace('/(tabs)/settings')}
           >
             <ArrowLeft size={16} color={theme.navigation.text} />
-            <Text style={[styles.inlineNavButtonText, { color: theme.navigation.text }]}>Back to settings</Text>
+            <Text style={[styles.inlineNavButtonText, { color: theme.navigation.text }]}>{t('Back to settings')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.inlineNavButton, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}
             onPress={() => router.replace('/(tabs)')}
           >
             <House size={16} color={theme.navigation.text} />
-            <Text style={[styles.inlineNavButtonText, { color: theme.navigation.text }]}>Home</Text>
+            <Text style={[styles.inlineNavButtonText, { color: theme.navigation.text }]}>{t('Home')}</Text>
           </TouchableOpacity>
         </RNView>
 
@@ -575,7 +587,7 @@ export default function ProfileScreen() {
                 }}
                 disabled={loading || initializing}
               >
-                <Text style={styles.avatarActionButtonText}>{avatarPreviewUrl ? 'Change photo' : 'Add photo'}</Text>
+                <Text style={styles.avatarActionButtonText}>{avatarPreviewUrl ? t('Change photo') : t('Add photo')}</Text>
               </TouchableOpacity>
 
               {(avatarPreviewUrl || avatarPath) ? (
@@ -585,17 +597,17 @@ export default function ProfileScreen() {
                   disabled={loading || initializing}
                 >
                   <Trash2 size={16} color="#EF4444" />
-                  <Text style={styles.avatarRemoveButtonText}>Remove</Text>
+                  <Text style={styles.avatarRemoveButtonText}>{t('Remove')}</Text>
                 </TouchableOpacity>
               ) : null}
             </RNView>
 
             <Text style={styles.avatarHint}>
-              {avatarDirty ? 'Save Profile to keep photo changes.' : 'Your profile photo appears in your account screens.'}
+              {avatarDirty ? t('Save Profile to keep photo changes.') : t('Your profile photo appears in your account screens.')}
             </Text>
           </RNView>
 
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>{t('Full Name')}</Text>
           <TextInput
             style={styles.input}
             placeholder={t('Your full name')}
@@ -604,7 +616,7 @@ export default function ProfileScreen() {
             onChangeText={setFullName}
           />
 
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('Email')}</Text>
           <TextInput
             style={styles.input}
             placeholder="email@example.com"
@@ -615,7 +627,7 @@ export default function ProfileScreen() {
             onChangeText={setEmail}
           />
 
-          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.label}>{t('Phone')}</Text>
           <TextInput
             style={styles.input}
             placeholder="+1 555 555 5555"
@@ -626,12 +638,12 @@ export default function ProfileScreen() {
           />
 
           <RNView style={styles.friendCodeCard}>
-            <Text style={styles.friendCodeLabel}>Invite Code</Text>
+            <Text style={styles.friendCodeLabel}>{t('Invite Code')}</Text>
             <Text selectable style={styles.friendCodeValue}>
-              {friendCode || (friendCodeStatus === 'loading' ? 'Setting up...' : 'Unavailable')}
+              {friendCode || (friendCodeStatus === 'loading' ? t('Setting up...') : t('Unavailable'))}
             </Text>
             <Text style={styles.friendCodeHint}>
-              Share this code with friends who are not in the app yet. Every 3 successful uses unlocks 1 month of Premium.
+              {t('Share this code with friends who are not in the app yet. Every 3 successful uses unlocks 1 month of Premium.')}
             </Text>
             <RNView style={styles.friendCodeActions}>
               <TouchableOpacity
@@ -641,7 +653,7 @@ export default function ProfileScreen() {
                 }}
                 disabled={!friendCode}
               >
-                <Text style={styles.friendCodeButtonText}>Share Code</Text>
+                <Text style={styles.friendCodeButtonText}>{t('Share code')}</Text>
               </TouchableOpacity>
               {!friendCode ? (
                 <TouchableOpacity
@@ -651,7 +663,7 @@ export default function ProfileScreen() {
                   }}
                   disabled={initializing}
                 >
-                  <Text style={styles.friendCodeRetryButtonText}>Refresh Code</Text>
+                  <Text style={styles.friendCodeRetryButtonText}>{t('Refresh code')}</Text>
                 </TouchableOpacity>
               ) : null}
             </RNView>
@@ -659,19 +671,19 @@ export default function ProfileScreen() {
 
           <RNView style={styles.inviteProgressCard}>
             <Text style={styles.inviteProgressEyebrow}>
-              {planTier === 'premium' ? 'Referral Status' : 'Referral Progress'}
+              {planTier === 'premium' ? t('Referral Status') : t('Referral Progress')}
             </Text>
             <Text style={styles.inviteProgressTitle}>
               {planTier === 'premium'
-                ? 'Premium is already active on this account'
-                : `${inviteSummary?.referralCount || 0}/3 uses toward your next Premium month`}
+                ? t('Premium is already active on this account')
+                : t('{count}/3 uses toward your next Premium month', { count: referralCount })}
             </Text>
             <Text style={styles.inviteProgressHint}>
               {rewardExpiryLabel
-                ? `Referral Premium active until ${rewardExpiryLabel}.`
+                ? t('Referral Premium active until {date}.', { date: rewardExpiryLabel })
                 : planTier === 'premium'
-                  ? 'Your account already has Premium access.'
-                  : `${inviteSummary?.referralsUntilNextReward || 3} more successful uses to unlock Premium.`}
+                  ? t('Your account already has Premium access.')
+                  : t('{count} more successful uses to unlock Premium.', { count: referralsUntilNextReward })}
             </Text>
 
             {planTier !== 'premium' ? (
@@ -679,7 +691,7 @@ export default function ProfileScreen() {
                 <RNView
                   style={[
                     styles.progressFill,
-                    { width: `${Math.min(((inviteSummary?.referralCount || 0) % 3 || 0) / 3 * 100, 100)}%` },
+                    { width: `${inviteProgressPercent}%` },
                   ]}
                 />
               </RNView>
@@ -687,7 +699,7 @@ export default function ProfileScreen() {
 
             {planTier !== 'premium' ? (
               <>
-                <Text style={styles.label}>Redeem Someone Else's Invite Code</Text>
+                <Text style={styles.label}>{t("Redeem Someone Else's Invite Code")}</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="ABC123"
@@ -699,8 +711,8 @@ export default function ProfileScreen() {
                 />
                 <Text style={styles.inviteRedeemHint}>
                   {inviteSummary?.referredByUserId
-                    ? `You already redeemed invite code ${inviteSummary.referredByCode || inviteCodeInput}.`
-                    : 'Invite codes only work on new accounts and can be redeemed once per account.'}
+                    ? t('You already redeemed invite code {code}.', { code: inviteSummary.referredByCode || inviteCodeInput })
+                    : t('Invite codes only work on new accounts and can be redeemed once per account.')}
                 </Text>
                 <TouchableOpacity
                   style={[
@@ -713,14 +725,14 @@ export default function ProfileScreen() {
                   disabled={applyingInviteCode || Boolean(inviteSummary?.referredByUserId)}
                 >
                   <Text style={styles.redeemButtonText}>
-                    {applyingInviteCode ? 'Applying...' : 'Apply Invite Code'}
+                    {applyingInviteCode ? t('Applying...') : t('Apply invite code')}
                   </Text>
                 </TouchableOpacity>
               </>
             ) : null}
           </RNView>
 
-          <Text style={styles.label}>Default Currency</Text>
+          <Text style={styles.label}>{t('Default Currency')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
             {CURRENCIES.map((currency) => (
               <TouchableOpacity
@@ -735,7 +747,7 @@ export default function ProfileScreen() {
             ))}
           </ScrollView>
 
-          <Text style={styles.label}>Default Language</Text>
+          <Text style={styles.label}>{t('Default Language')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
             {SUPPORTED_LANGUAGES.map((language) => (
               <TouchableOpacity
@@ -755,12 +767,12 @@ export default function ProfileScreen() {
 
           <RNView style={styles.appearanceSection}>
             <ThemePreferencePicker
-              title="Theme Mode"
-              description="Choose whether this account stays in light mode, dark mode, or follows the system on this device."
+              title={t('Theme Mode')}
+              description={t('Choose whether this account stays in light mode, dark mode, or follows the system on this device.')}
             />
             <RNView style={styles.appearanceSpacer} />
             <ColorPalettePicker
-              description="Pick an accent palette. In dark mode, the base stays neutral gray like the web app."
+              description={t('Pick an accent palette. In dark mode, the base stays neutral gray like the web app.')}
             />
           </RNView>
         </Card>
@@ -770,7 +782,7 @@ export default function ProfileScreen() {
           onPress={handleSave}
           style={[styles.saveButton, (loading || initializing) && styles.disabled]}
         >
-          <Text style={styles.saveButtonText}>{loading ? 'Saving...' : 'Save Profile'}</Text>
+          <Text style={styles.saveButtonText}>{loading ? t('Saving...') : t('Save Profile')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </Screen>
