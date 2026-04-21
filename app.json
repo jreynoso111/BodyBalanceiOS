@@ -29,7 +29,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "versionCode": 21
+      "versionCode": 24
     },
     "plugins": [
       "expo-router",

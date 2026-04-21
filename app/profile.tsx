@@ -5,8 +5,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { Screen, Card, Text, View } from '@/components/Themed';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/services/supabase';
-import { CURRENCIES } from '@/constants/Currencies';
-import { AppLanguage, getDeviceLanguage, normalizeLanguage, SUPPORTED_LANGUAGES } from '@/constants/i18n';
 import { useI18n } from '@/hooks/useI18n';
 import { ArrowLeft, Camera, House, Trash2 } from 'lucide-react-native';
 import {
@@ -18,19 +16,17 @@ import {
 import { applyInvitationCode, formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
 import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
-import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
-const isMissingDefaultLanguageColumn = (message?: string) =>
-  String(message || '').toLowerCase().includes('default_language');
 const isMissingFriendCodeColumn = (message?: string) =>
   String(message || '').toLowerCase().includes('friend_code');
 
 export default function ProfileScreen() {
-  const { user, planTier, initialized, setLanguage, setPlanTier } = useAuthStore();
+  const { user, planTier, initialized, setPlanTier } = useAuthStore();
   const { t } = useI18n();
-  const { theme } = useAppTheme();
+  const { theme, colorScheme } = useAppTheme();
   const router = useRouter();
+  const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,8 +34,6 @@ export default function ProfileScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [currencyDefault, setCurrencyDefault] = useState('USD');
-  const [defaultLanguage, setDefaultLanguage] = useState<AppLanguage>(getDeviceLanguage());
   const [friendCode, setFriendCode] = useState('');
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [inviteSummary, setInviteSummary] = useState<InviteSummary | null>(null);
@@ -58,22 +52,20 @@ export default function ProfileScreen() {
     setFullName((current) => current || String(user.user_metadata?.full_name || '').trim());
     setEmail((current) => current || user.email || '');
 
-    const fullFields = 'full_name, email, phone, currency_default, default_language, avatar_url, friend_code, plan_tier, premium_referral_expires_at';
+    const fullFields = 'full_name, email, phone, avatar_url, friend_code, plan_tier, premium_referral_expires_at';
     let { data, error } = await supabase
       .from('profiles')
       .select(fullFields)
       .eq('id', user.id)
       .maybeSingle();
 
-    if (error && (isMissingDefaultLanguageColumn(error.message) || isMissingAvatarUrlColumn(error.message) || isMissingFriendCodeColumn(error.message))) {
+    if (error && (isMissingAvatarUrlColumn(error.message) || isMissingFriendCodeColumn(error.message))) {
       const fallbackFields = [
         'full_name',
         'email',
         'phone',
-        'currency_default',
         'plan_tier',
         'premium_referral_expires_at',
-        ...(isMissingDefaultLanguageColumn(error.message) ? [] : ['default_language']),
         ...(isMissingAvatarUrlColumn(error.message) ? [] : ['avatar_url']),
         ...(isMissingFriendCodeColumn(error.message) ? [] : ['friend_code']),
       ].join(', ');
@@ -132,8 +124,6 @@ export default function ProfileScreen() {
       setFullName(data.full_name || String(user.user_metadata?.full_name || '').trim() || '');
       setEmail(data.email || user.email || '');
       setPhone(data.phone || '');
-      setCurrencyDefault(data.currency_default || 'USD');
-      setDefaultLanguage(normalizeLanguage((data as any).default_language, getDeviceLanguage()));
       setFriendCode(resolvedFriendCode);
       setFriendCodeStatus(resolvedFriendCode ? 'ready' : 'missing');
       setPlanTier(normalizePlanTier((data as any)?.plan_tier, (data as any)?.premium_referral_expires_at));
@@ -217,7 +207,6 @@ export default function ProfileScreen() {
     const previousAvatarPath = avatarPath;
     let uploadedAvatarPath: string | null = null;
     let nextAvatarPath = avatarMarkedForRemoval ? null : avatarPath;
-    let languageSavedWithFallback = false;
     let avatarSavedWithFallback = false;
 
     try {
@@ -234,22 +223,16 @@ export default function ProfileScreen() {
         full_name: fullName.trim() || null,
         phone: phone.trim() || null,
         email: email.trim() || user.email || null,
-        currency_default: String(currencyDefault || 'USD').trim().toUpperCase() || 'USD',
-        default_language: defaultLanguage,
         avatar_url: nextAvatarPath,
         updated_at: new Date().toISOString(),
       };
 
       let { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
 
-      if (error && (isMissingDefaultLanguageColumn(error.message) || isMissingAvatarUrlColumn(error.message))) {
-        languageSavedWithFallback = isMissingDefaultLanguageColumn(error.message);
+      if (error && isMissingAvatarUrlColumn(error.message)) {
         avatarSavedWithFallback = isMissingAvatarUrlColumn(error.message);
 
         const fallbackPatch = { ...patch };
-        if (languageSavedWithFallback) {
-          delete fallbackPatch.default_language;
-        }
         if (avatarSavedWithFallback) {
           delete fallbackPatch.avatar_url;
         }
@@ -276,7 +259,6 @@ export default function ProfileScreen() {
         }
       }
 
-      setLanguage(defaultLanguage);
       setAvatarPath(nextAvatarPath);
       setAvatarPreviewUrl(getProfileAvatarPublicUrl(nextAvatarPath));
       avatarBase64Ref.current = null;
@@ -285,9 +267,6 @@ export default function ProfileScreen() {
       setAvatarDirty(false);
 
       const fallbackNotes: string[] = [];
-      if (languageSavedWithFallback) {
-        fallbackNotes.push('Default Language');
-      }
       if (avatarSavedWithFallback) {
         fallbackNotes.push('Profile photo');
       }
@@ -383,8 +362,8 @@ export default function ProfileScreen() {
     return (
       <WebAccountLayout
         eyebrow={t('Profile')}
-        title={t('Edit identity, defaults, and invite settings.')}
-        description={t('These changes update the same Buddy Balance profile record used by the mobile app.')}
+        title={t('Edit identity, social details, and invite settings.')}
+        description={t('Use profile for the personal information that represents your account across Buddy Balance.')}
       >
         <Card style={styles.webProfileCard}>
           <RNView style={styles.webAvatarRow}>
@@ -398,96 +377,72 @@ export default function ProfileScreen() {
               )}
             </RNView>
             <RNView style={styles.webAvatarCopy}>
-              <Text style={styles.webCardTitle}>{t('Profile photo')}</Text>
-              <Text style={styles.webCardBody}>{t('Use the mobile app if you want to upload or crop a new avatar. Web focuses on account management and profile data.')}</Text>
+              <Text style={[styles.webCardTitle, { color: theme.title }]}>{t('Profile photo')}</Text>
+              <Text style={[styles.webCardBody, { color: theme.secondaryText }]}>{t('Use the mobile app if you want to upload or crop a new avatar. Web focuses on account management and profile data.')}</Text>
             </RNView>
           </RNView>
         </Card>
 
         <View style={styles.webGrid}>
           <Card style={styles.webFormCard}>
-            <Text style={styles.webCardTitle}>{t('Identity')}</Text>
-            <Text style={styles.label}>{t('Full Name')}</Text>
+            <Text style={[styles.webCardTitle, { color: theme.title }]}>{t('Identity')}</Text>
+            <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Full Name')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
               placeholder={t('Your full name')}
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={theme.tertiaryText}
               value={fullName}
               onChangeText={setFullName}
             />
 
-            <Text style={styles.label}>{t('Email')}</Text>
+            <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Email')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
               placeholder="email@example.com"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={theme.tertiaryText}
               keyboardType="email-address"
               autoCapitalize="none"
               value={email}
               onChangeText={setEmail}
             />
 
-            <Text style={styles.label}>{t('Phone')}</Text>
+            <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Phone')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
               placeholder="+1 555 555 5555"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={theme.tertiaryText}
               keyboardType="phone-pad"
               value={phone}
               onChangeText={setPhone}
             />
 
-            <Text style={styles.label}>{t('Default Currency')}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="USD"
-              placeholderTextColor="#94A3B8"
-              value={currencyDefault}
-              onChangeText={setCurrencyDefault}
-            />
-
-            <Text style={styles.label}>{t('Default Language')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-              {SUPPORTED_LANGUAGES.map((language) => (
-                <TouchableOpacity
-                  key={language.code}
-                  style={[styles.chip, defaultLanguage === language.code && styles.chipActive]}
-                  onPress={() => setDefaultLanguage(language.code)}
-                >
-                  <Text style={[styles.chipText, defaultLanguage === language.code && styles.chipTextActive]}>
-                    {language.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity style={styles.webPrimaryButton} onPress={() => void handleSave()} disabled={loading || initializing}>
+            <TouchableOpacity style={[styles.webPrimaryButton, { backgroundColor: theme.primaryButton }]} onPress={() => void handleSave()} disabled={loading || initializing}>
               <Text style={styles.webPrimaryButtonText}>{loading ? t('Saving...') : t('Save Profile')}</Text>
             </TouchableOpacity>
           </Card>
 
           <Card style={styles.webInviteCard}>
-            <Text style={styles.webCardTitle}>{t('Invite and referral')}</Text>
-            <Text style={styles.webCardBody}>{t('Share this code with friends who are not in the app yet. Every 3 successful uses unlocks 1 month of Premium.')}</Text>
-            <Text selectable style={styles.webInviteCode}>{friendCode || t('Setting up...')}</Text>
+            <Text style={[styles.webCardTitle, { color: theme.title }]}>{t('Invite and referral')}</Text>
+            <Text style={[styles.webCardBody, { color: theme.secondaryText }]}>{t('Share this code with friends who are not in the app yet. Every 3 successful uses unlocks 1 month of Premium.')}</Text>
+            <Text selectable style={[styles.webInviteCode, { color: theme.tint }]}>{friendCode || t('Setting up...')}</Text>
             <TouchableOpacity
-              style={[styles.webSecondaryButton, !friendCode && styles.webSecondaryButtonDisabled]}
+              style={[styles.webSecondaryButton, { borderColor: theme.inputBorder, backgroundColor: theme.inputBackground }, !friendCode && styles.webSecondaryButtonDisabled]}
               onPress={() => { void handleShareFriendCode(); }}
               disabled={!friendCode}
             >
-              <Text style={styles.webSecondaryButtonText}>{t('Share code')}</Text>
+              <Text style={[styles.webSecondaryButtonText, { color: theme.navigation.text }]}>{t('Share code')}</Text>
             </TouchableOpacity>
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
               placeholder={t('Enter an invite code to redeem it.')}
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={theme.tertiaryText}
               value={inviteCodeInput}
               onChangeText={setInviteCodeInput}
               autoCapitalize="characters"
             />
             <TouchableOpacity
-              style={styles.webPrimaryButton}
+              style={[styles.webPrimaryButton, { backgroundColor: theme.primaryButton }]}
               onPress={() => void handleApplyInviteCode()}
               disabled={applyingInviteCode}
             >
@@ -495,7 +450,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             {inviteSummary ? (
-              <Text style={styles.webHintText}>
+              <Text style={[styles.webHintText, { color: theme.secondaryText }]}>
                 {rewardExpiryLabel
                   ? t('Referral Premium active until {date}.', { date: rewardExpiryLabel })
                   : t('{count}/3 uses toward your next Premium month', { count: inviteSummary.referralCount })}
@@ -574,14 +529,14 @@ export default function ProfileScreen() {
                   <Text style={styles.avatarFallbackText}>{profileInitial}</Text>
                 </RNView>
               )}
-              <RNView style={styles.avatarBadge}>
+              <RNView style={[styles.avatarBadge, { backgroundColor: theme.primaryButton, borderColor: theme.navigation.card }]}>
                 <Camera size={16} color="#FFFFFF" />
               </RNView>
             </TouchableOpacity>
 
             <RNView style={styles.avatarActions}>
               <TouchableOpacity
-                style={styles.avatarActionButton}
+                style={[styles.avatarActionButton, { backgroundColor: theme.primaryButton }]}
                 onPress={() => {
                   void pickAvatar();
                 }}
@@ -592,7 +547,7 @@ export default function ProfileScreen() {
 
               {(avatarPreviewUrl || avatarPath) ? (
                 <TouchableOpacity
-                  style={styles.avatarRemoveButton}
+                  style={[styles.avatarRemoveButton, { backgroundColor: isDark ? 'rgba(127,29,29,0.22)' : '#FFF1F2', borderColor: isDark ? 'rgba(248,113,113,0.28)' : '#FECDD3' }]}
                   onPress={removeAvatarSelection}
                   disabled={loading || initializing}
                 >
@@ -602,52 +557,52 @@ export default function ProfileScreen() {
               ) : null}
             </RNView>
 
-            <Text style={styles.avatarHint}>
+            <Text style={[styles.avatarHint, { color: theme.secondaryText }]}>
               {avatarDirty ? t('Save Profile to keep photo changes.') : t('Your profile photo appears in your account screens.')}
             </Text>
           </RNView>
 
-          <Text style={styles.label}>{t('Full Name')}</Text>
+          <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Full Name')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
             placeholder={t('Your full name')}
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={theme.tertiaryText}
             value={fullName}
             onChangeText={setFullName}
           />
 
-          <Text style={styles.label}>{t('Email')}</Text>
+          <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Email')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
             placeholder="email@example.com"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={theme.tertiaryText}
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
 
-          <Text style={styles.label}>{t('Phone')}</Text>
+          <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Phone')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
             placeholder="+1 555 555 5555"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={theme.tertiaryText}
             keyboardType="phone-pad"
             value={phone}
             onChangeText={setPhone}
           />
 
-          <RNView style={styles.friendCodeCard}>
-            <Text style={styles.friendCodeLabel}>{t('Invite Code')}</Text>
-            <Text selectable style={styles.friendCodeValue}>
+          <RNView style={[styles.friendCodeCard, { backgroundColor: theme.tintSoft, borderColor: theme.tintBorder }]}>
+            <Text style={[styles.friendCodeLabel, { color: theme.tint }]}>{t('Invite Code')}</Text>
+            <Text selectable style={[styles.friendCodeValue, { color: theme.title }]}>
               {friendCode || (friendCodeStatus === 'loading' ? t('Setting up...') : t('Unavailable'))}
             </Text>
-            <Text style={styles.friendCodeHint}>
+            <Text style={[styles.friendCodeHint, { color: theme.secondaryText }]}>
               {t('Share this code with friends who are not in the app yet. Every 3 successful uses unlocks 1 month of Premium.')}
             </Text>
             <RNView style={styles.friendCodeActions}>
               <TouchableOpacity
-                style={[styles.friendCodeButton, !friendCode && styles.friendCodeButtonDisabled]}
+                style={[styles.friendCodeButton, { backgroundColor: theme.primaryButton }, !friendCode && styles.friendCodeButtonDisabled]}
                 onPress={() => {
                   void handleShareFriendCode();
                 }}
@@ -657,28 +612,28 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               {!friendCode ? (
                 <TouchableOpacity
-                  style={styles.friendCodeRetryButton}
+                  style={[styles.friendCodeRetryButton, { backgroundColor: theme.navigation.card, borderColor: theme.tintBorder }]}
                   onPress={() => {
                     void loadProfile();
                   }}
                   disabled={initializing}
                 >
-                  <Text style={styles.friendCodeRetryButtonText}>{t('Refresh code')}</Text>
+                  <Text style={[styles.friendCodeRetryButtonText, { color: theme.tint }]}>{t('Refresh code')}</Text>
                 </TouchableOpacity>
               ) : null}
             </RNView>
           </RNView>
 
-          <RNView style={styles.inviteProgressCard}>
-            <Text style={styles.inviteProgressEyebrow}>
+          <RNView style={[styles.inviteProgressCard, { backgroundColor: isDark ? 'rgba(124,45,18,0.22)' : '#FFF7ED', borderColor: isDark ? 'rgba(251,146,60,0.28)' : '#FED7AA' }]}>
+            <Text style={[styles.inviteProgressEyebrow, { color: isDark ? '#FDBA74' : '#C2410C' }]}>
               {planTier === 'premium' ? t('Referral Status') : t('Referral Progress')}
             </Text>
-            <Text style={styles.inviteProgressTitle}>
+            <Text style={[styles.inviteProgressTitle, { color: theme.title }]}>
               {planTier === 'premium'
                 ? t('Premium is already active on this account')
                 : t('{count}/3 uses toward your next Premium month', { count: referralCount })}
             </Text>
-            <Text style={styles.inviteProgressHint}>
+            <Text style={[styles.inviteProgressHint, { color: isDark ? '#FED7AA' : '#7C2D12' }]}>
               {rewardExpiryLabel
                 ? t('Referral Premium active until {date}.', { date: rewardExpiryLabel })
                 : planTier === 'premium'
@@ -687,7 +642,7 @@ export default function ProfileScreen() {
             </Text>
 
             {planTier !== 'premium' ? (
-              <RNView style={styles.progressTrack}>
+              <RNView style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(251,146,60,0.16)' : '#FFEDD5' }]}>
                 <RNView
                   style={[
                     styles.progressFill,
@@ -699,17 +654,17 @@ export default function ProfileScreen() {
 
             {planTier !== 'premium' ? (
               <>
-                <Text style={styles.label}>{t("Redeem Someone Else's Invite Code")}</Text>
+                <Text style={[styles.label, { color: theme.secondaryText }]}>{t("Redeem Someone Else's Invite Code")}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
                   placeholder="ABC123"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={theme.tertiaryText}
                   autoCapitalize="characters"
                   value={inviteCodeInput}
                   onChangeText={(value) => setInviteCodeInput(value.toUpperCase())}
                   editable={!inviteSummary?.referredByUserId && !applyingInviteCode}
                 />
-                <Text style={styles.inviteRedeemHint}>
+                <Text style={[styles.inviteRedeemHint, { color: isDark ? '#FED7AA' : '#9A3412' }]}>
                   {inviteSummary?.referredByUserId
                     ? t('You already redeemed invite code {code}.', { code: inviteSummary.referredByCode || inviteCodeInput })
                     : t('Invite codes only work on new accounts and can be redeemed once per account.')}
@@ -717,6 +672,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity
                   style={[
                     styles.redeemButton,
+                    { backgroundColor: theme.primaryButton },
                     (applyingInviteCode || Boolean(inviteSummary?.referredByUserId)) && styles.redeemButtonDisabled,
                   ]}
                   onPress={() => {
@@ -732,55 +688,12 @@ export default function ProfileScreen() {
             ) : null}
           </RNView>
 
-          <Text style={styles.label}>{t('Default Currency')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-            {CURRENCIES.map((currency) => (
-              <TouchableOpacity
-                key={currency.code}
-                style={[styles.chip, currencyDefault === currency.code && styles.chipActive]}
-                onPress={() => setCurrencyDefault(currency.code)}
-              >
-                <Text style={[styles.chipText, currencyDefault === currency.code && styles.chipTextActive]}>
-                  {currency.code}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <Text style={styles.label}>{t('Default Language')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-            {SUPPORTED_LANGUAGES.map((language) => (
-              <TouchableOpacity
-                key={language.code}
-                style={[styles.chip, defaultLanguage === language.code && styles.chipActive]}
-                onPress={() => {
-                  setDefaultLanguage(language.code);
-                  setLanguage(language.code);
-                }}
-              >
-                <Text style={[styles.chipText, defaultLanguage === language.code && styles.chipTextActive]}>
-                  {language.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          <RNView style={styles.appearanceSection}>
-            <ThemePreferencePicker
-              title={t('Theme Mode')}
-              description={t('Choose whether this account stays in light mode, dark mode, or follows the system on this device.')}
-            />
-            <RNView style={styles.appearanceSpacer} />
-            <ColorPalettePicker
-              description={t('Pick an accent palette. In dark mode, the base stays neutral gray like the web app.')}
-            />
-          </RNView>
         </Card>
 
         <TouchableOpacity
           disabled={loading || initializing}
           onPress={handleSave}
-          style={[styles.saveButton, (loading || initializing) && styles.disabled]}
+          style={[styles.saveButton, { backgroundColor: theme.primaryButton }, (loading || initializing) && styles.disabled]}
         >
           <Text style={styles.saveButtonText}>{loading ? t('Saving...') : t('Save Profile')}</Text>
         </TouchableOpacity>

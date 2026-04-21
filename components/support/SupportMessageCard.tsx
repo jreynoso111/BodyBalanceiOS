@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { Card, Text } from '@/components/Themed';
+import { useI18n } from '@/hooks/useI18n';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
 
@@ -19,6 +21,8 @@ export function SupportMessageCard({
   signedOutDescription = 'Sign in to send a support message tied to your account history, contacts, and shared records.',
 }: SupportMessageCardProps) {
   const { user } = useAuthStore();
+  const { t } = useI18n();
+  const { theme } = useAppTheme();
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -59,34 +63,34 @@ export function SupportMessageCard({
 
   return (
     <Card style={styles.card}>
-      <Text style={styles.title}>{user?.id ? title : signedOutTitle}</Text>
-      <Text style={styles.description}>{user?.id ? description : signedOutDescription}</Text>
+      <Text style={[styles.title, { color: theme.title }]}>{user?.id ? title : signedOutTitle}</Text>
+      <Text style={[styles.description, { color: theme.secondaryText }]}>{user?.id ? description : signedOutDescription}</Text>
 
       {user?.id ? (
         <View>
           <TextInput
             value={subject}
             onChangeText={setSubject}
-            placeholder="Subject (optional)"
-            placeholderTextColor="#94A3B8"
-            style={styles.input}
+            placeholder={t('Subject (optional)')}
+            placeholderTextColor={theme.tertiaryText}
+            style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
           />
           <TextInput
             value={message}
             onChangeText={setMessage}
-            placeholder="Describe what happened, what account or contact was involved, and what you expected..."
-            placeholderTextColor="#94A3B8"
-            style={[styles.input, styles.textarea]}
+            placeholder={t('Describe what happened, what account or contact was involved, and what you expected...')}
+            placeholderTextColor={theme.tertiaryText}
+            style={[styles.input, styles.textarea, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
             multiline
             textAlignVertical="top"
           />
-          <TouchableOpacity style={styles.sendButton} onPress={() => void submitSupportMessage()} disabled={sending}>
-            <Text style={styles.sendButtonText}>{sending ? 'Sending...' : 'Send to support'}</Text>
+          <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.primaryButton }]} onPress={() => void submitSupportMessage()} disabled={sending}>
+            <Text style={styles.sendButtonText}>{sending ? t('Sending...') : t('Send to support')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.signedOutBadge}>
-          <Text style={styles.signedOutBadgeText}>Sign in from the app or web account view to open a tracked support request.</Text>
+        <View style={[styles.signedOutBadge, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+          <Text style={[styles.signedOutBadgeText, { color: theme.secondaryText }]}>{t('Sign in from the app or web account view to open a tracked support request.')}</Text>
         </View>
       )}
     </Card>

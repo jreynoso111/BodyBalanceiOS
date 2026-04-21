@@ -96,6 +96,31 @@ export async function applyInvitationCode(code: string): Promise<{
   };
 }
 
+export async function createReferralEmailInvite(inviteeEmail: string): Promise<{
+  data: { inviteeEmail: string; inviteCode: string } | null;
+  error: Error | null;
+}> {
+  const { data, error } = await supabase.rpc('create_referral_email_invite', {
+    p_invitee_email: inviteeEmail,
+  });
+
+  if (error) {
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const payload = Array.isArray(data) ? data[0] : data;
+
+  return {
+    data: payload
+      ? {
+          inviteeEmail: String(payload.invitee_email || '').trim().toLowerCase(),
+          inviteCode: String(payload.invite_code || '').trim().toUpperCase(),
+        }
+      : null,
+    error: null,
+  };
+}
+
 export async function markLatestReferralRewardSeen(): Promise<Error | null> {
   const { error } = await supabase.rpc('mark_latest_referral_reward_seen');
   return error ? new Error(error.message) : null;

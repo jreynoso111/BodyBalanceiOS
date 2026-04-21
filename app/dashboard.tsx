@@ -11,8 +11,8 @@ export default function AccountDashboardScreen() {
   const router = useRouter();
   const { initialized, user, role, planTier } = useAuthStore();
 
-  if (Platform.OS === 'web' && initialized && !user) {
-    return <Redirect href="/(auth)/login" />;
+  if (initialized && !user) {
+    return <Redirect href="/" />;
   }
 
   if (Platform.OS !== 'web') {

@@ -4,7 +4,7 @@ import { Link, Redirect } from 'expo-router';
 import { Text, View, Screen, Card } from '@/components/Themed';
 import { signOutLocalSession, supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
-import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles } from 'lucide-react-native';
+import { LogOut, User, Bell, Shield, CircleHelp, FileOutput, ChevronRight, Sparkles, SlidersHorizontal } from 'lucide-react-native';
 import { exportLoansToCSV } from '@/services/exportService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { DEFAULT_USER_PREFERENCES, getOrCreateUserPreferences } from '@/services/userPreferences';
@@ -12,14 +12,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfileAvatarPublicUrl, isMissingAvatarUrlColumn } from '@/services/profileAvatar';
 import { getMembershipStatus, getPlanLabel, hasPremiumAccess, normalizePlanTier } from '@/services/subscriptionPlan';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
-import { ColorPalettePicker, ThemePreferencePicker } from '@/components/ThemeControls';
 import { useI18n } from '@/hooks/useI18n';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
 
 export default function SettingsScreen() {
     const { user, role, planTier, initialized, setSession, setUser, setRole, setPlanTier } = useAuthStore();
     const { t } = useI18n();
+    const { theme, colorScheme } = useAppTheme();
     const router = useRouter();
     const [prefs, setPrefs] = React.useState(DEFAULT_USER_PREFERENCES);
     const [profileName, setProfileName] = React.useState('');
@@ -28,6 +29,11 @@ export default function SettingsScreen() {
     const [signingOut, setSigningOut] = React.useState(false);
     const normalizedRole = (role || '').toLowerCase().trim();
     const hasAdminAccess = normalizedRole === 'admin' || normalizedRole === 'administrator';
+    const isDark = colorScheme === 'dark';
+
+    if (initialized && !user) {
+        return <Redirect href="/" />;
+    }
 
     const navigateToLanding = () => {
         const resetNavigation = (router as any)?.dismissAll;
@@ -150,7 +156,8 @@ export default function SettingsScreen() {
             sub: t(membershipStatus === 'premium' ? 'Annual membership active' : membershipStatus === 'trial' ? '21-day free trial active' : 'Your 21-day free trial has ended'),
             onPress: () => router.push('/subscription' as any),
         },
-        { icon: User, label: t('Profile'), sub: user?.email, onPress: () => router.push('/profile') },
+        { icon: User, label: t('Profile'), sub: t('Photo, name, phone, invite code'), onPress: () => router.push('/profile') },
+        { icon: SlidersHorizontal, label: t('Preferences'), sub: t('Appearance, language, currency'), onPress: () => router.push('/preferences') },
         { icon: Bell, label: t('Notifications'), sub: t(prefs.push_enabled ? 'Enabled' : 'Disabled'), onPress: () => router.push('/notifications') },
         { icon: Shield, label: t('Security'), sub: t(prefs.biometric_enabled ? 'Biometric On' : 'Biometric Off'), onPress: () => router.push('/security') },
         { icon: CircleHelp, label: t('Help & Support'), sub: t('FAQ & guidance'), onPress: () => router.push('/help-support') },
@@ -177,10 +184,6 @@ export default function SettingsScreen() {
     const avatarInitial = (profileName || user?.email || '?').trim().charAt(0).toUpperCase();
 
     if (Platform.OS === 'web') {
-        if (initialized && !user) {
-            return <Redirect href="/(auth)/login" />;
-        }
-
         return (
             <WebAccountLayout
                 eyebrow={t('Account Center')}
@@ -204,7 +207,7 @@ export default function SettingsScreen() {
                             </RNView>
                         </RNView>
                         <Text style={styles.webSummaryText}>
-                            {t('Use Profile to edit identity details, Membership to review Premium access, Notifications to tune alerts, and Security to control biometrics and password changes.')}
+                            {t('Use Profile for personal identity details, Preferences for appearance and app defaults, Membership to review Premium access, Notifications to tune alerts, and Security to control biometrics and password changes.')}
                         </Text>
                     </Card>
 
@@ -213,6 +216,7 @@ export default function SettingsScreen() {
                         <RNView style={styles.webLinkStack}>
                             <Link href="/dashboard" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Dashboard overview')}</Text></Pressable></Link>
                             <Link href="/profile" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Edit profile')}</Text></Pressable></Link>
+                            <Link href="/preferences" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Preferences')}</Text></Pressable></Link>
                             <Link href="/subscription" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('View membership')}</Text></Pressable></Link>
                             <Link href="/notifications" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Notification settings')}</Text></Pressable></Link>
                             <Link href="/security" asChild><Pressable style={styles.webLinkButton}><Text style={styles.webLinkText}>{t('Security settings')}</Text></Pressable></Link>
@@ -284,23 +288,17 @@ export default function SettingsScreen() {
                             onPress={item.onPress}
                         >
                             <RNView style={styles.itemLeft}>
-                                <RNView style={styles.iconCircle}>
-                                    <item.icon size={20} color="#6366F1" />
+                                <RNView style={[styles.iconCircle, { backgroundColor: theme.tintSoft, borderColor: theme.navigation.border }]}>
+                                    <item.icon size={20} color={theme.tint} />
                                 </RNView>
                                 <RNView style={styles.textContainer}>
-                                    <Text style={styles.label}>{item.label}</Text>
-                                    {item.sub ? <Text style={styles.subLabel}>{item.sub}</Text> : null}
+                                    <Text style={[styles.label, { color: theme.title }]}>{item.label}</Text>
+                                    {item.sub ? <Text style={[styles.subLabel, { color: theme.secondaryText }]}>{item.sub}</Text> : null}
                                 </RNView>
                             </RNView>
-                            <ChevronRight size={18} color="#94A3B8" />
+                            <ChevronRight size={18} color={theme.tertiaryText} />
                         </TouchableOpacity>
                     ))}
-                </Card>
-
-                <Card style={styles.appearanceCard}>
-                    <ThemePreferencePicker />
-                    <RNView style={styles.appearanceSpacer} />
-                    <ColorPalettePicker />
                 </Card>
 
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} disabled={signingOut}>
@@ -308,7 +306,7 @@ export default function SettingsScreen() {
                     <Text style={styles.signOutText}>{signingOut ? t('Signing out...') : t('Sign out')}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.version}>Buddy Balance v1.0.0</Text>
+                <Text style={[styles.version, { color: theme.tertiaryText }]}>Buddy Balance v1.0.0</Text>
             </ScrollView>
         </Screen>
     );
@@ -420,14 +418,6 @@ const styles = StyleSheet.create({
         gap: 10,
         borderWidth: 1,
         borderColor: 'rgba(239, 68, 68, 0.1)',
-    },
-    appearanceCard: {
-        marginBottom: 24,
-        padding: 20,
-    },
-    appearanceSpacer: {
-        height: 18,
-        backgroundColor: 'transparent',
     },
     signOutText: {
         color: '#EF4444',

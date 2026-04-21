@@ -108,7 +108,6 @@ export default function ContactsScreen() {
   const horizontalPadding = isTablet ? 28 : 20;
   const maxContentWidth = isTablet ? 760 : undefined;
   const bottomInset = Math.max(insets.bottom, 12);
-  const fabBottomOffset = bottomInset + 16;
   const listBottomPadding = bottomInset + 88;
 
   const fetchContacts = useCallback(async () => {
@@ -360,15 +359,21 @@ export default function ContactsScreen() {
   return (
     <Screen style={styles.container} safeAreaEdges={['left', 'right', 'bottom']}>
       <RNView style={[styles.searchWrapper, { paddingHorizontal: horizontalPadding, paddingTop: isTablet ? 24 : 20 }]}>
-        <View style={[styles.searchContainer, maxContentWidth ? { maxWidth: maxContentWidth, alignSelf: 'center', width: '100%' } : null]}>
-          <Search size={20} color="#94A3B8" />
-          <TextInput
-            placeholder="Search contacts..."
-            placeholderTextColor="#94A3B8"
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <View style={[styles.searchRow, maxContentWidth ? { maxWidth: maxContentWidth, alignSelf: 'center', width: '100%' } : null]}>
+          <View style={styles.searchContainer}>
+            <Search size={20} color="#94A3B8" />
+            <TextInput
+              placeholder="Search contacts..."
+              placeholderTextColor="#94A3B8"
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity style={styles.addContactButton} onPress={() => router.push('/new-contact')}>
+            <UserPlus size={18} color="#FFFFFF" />
+            <Text style={styles.addContactButtonText}>Add</Text>
+          </TouchableOpacity>
         </View>
       </RNView>
 
@@ -676,19 +681,6 @@ export default function ContactsScreen() {
         ListFooterComponent={<AppLegalFooter style={styles.copyright} />}
       />
 
-      <TouchableOpacity
-        style={[
-          styles.fab,
-          {
-            right: horizontalPadding,
-            bottom: fabBottomOffset,
-          },
-        ]}
-        onPress={() => router.push('/new-contact')}
-      >
-        <UserPlus color="#fff" size={28} />
-      </TouchableOpacity>
-
       <Modal
         animationType="slide"
         transparent
@@ -880,7 +872,13 @@ const styles = StyleSheet.create({
   searchWrapper: {
     backgroundColor: 'transparent',
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
@@ -895,6 +893,21 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#0F172A',
+  },
+  addContactButton: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#6366F1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  addContactButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   listContent: {
     paddingTop: 20,
@@ -1396,20 +1409,6 @@ const styles = StyleSheet.create({
   },
   historyRowLast: {
     borderBottomWidth: 0,
-  },
-  fab: {
-    position: 'absolute',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
   },
   copyright: {
     textAlign: 'center',

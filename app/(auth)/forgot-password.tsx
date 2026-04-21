@@ -8,12 +8,14 @@ import { isValidEmail, normalizeAuthEmail } from '@/services/authFlowUtils';
 import { requestPasswordReset } from '@/services/publicAuth';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { useI18n } from '@/hooks/useI18n';
 
 type FeedbackTone = 'error' | 'success' | 'info';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
     const { theme } = useAppTheme();
+    const { t } = useI18n();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string } | null>(null);
@@ -57,17 +59,17 @@ export default function ForgotPasswordScreen() {
 
     const form = (
         <Card style={styles.card}>
-            <Text style={[styles.title, { color: theme.title }]}>Reset password</Text>
+            <Text style={[styles.title, { color: theme.title }]}>{t('Reset password')}</Text>
             <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
-                We will send a link to reset your password.
+                {t('We will send a link to reset your password.')}
             </Text>
 
             <RNView style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.secondaryText }]}>Email</Text>
+                <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Email')}</Text>
                 <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                     <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                     <TextInput
-                        placeholder="name@email.com"
+                        placeholder={t('name@email.com')}
                         placeholderTextColor={theme.tertiaryText}
                         value={email}
                         onChangeText={setEmail}
@@ -83,7 +85,7 @@ export default function ForgotPasswordScreen() {
                 disabled={loading}
                 style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, loading && { opacity: 0.7 }]}
             >
-                <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>{loading ? 'SENDING...' : 'Send link'}</Text>
+                <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>{loading ? t('SENDING...') : t('Send link')}</Text>
             </TouchableOpacity>
 
             {feedback ? (
@@ -128,21 +130,21 @@ export default function ForgotPasswordScreen() {
             >
                 {Platform.OS === 'web' ? (
                     <WebAuthLayout
-                        eyebrow="Password recovery"
-                        title="Recover your Buddy Balance account without leaving the browser."
-                        description="Use the same password reset flow as the app. A secure recovery link will be sent to the email address tied to your account."
+                        eyebrow={t('Password recovery')}
+                        title={t('Recover your Buddy Balance account without leaving the browser.')}
+                        description={t('Use the same password reset flow as the app. A secure recovery link will be sent to the email address tied to your account.')}
                         highlights={[
-                            'Same account as mobile',
-                            'Secure email reset flow',
-                            'Works with your new branded sender',
-                            'Access restored to web and app',
+                            t('Same account as mobile'),
+                            t('Secure email reset flow'),
+                            t('Works with your new branded sender'),
+                            t('Access restored to web and app'),
                         ]}
-                        altAction={{ href: '/(auth)/login', label: 'Back to sign in' }}
+                        altAction={{ href: '/(auth)/login', label: t('Back to sign in') }}
                     >
                         <RNView style={styles.webIntro}>
-                            <Text style={[styles.webTitle, { color: theme.title }]}>Forgot your password?</Text>
+                            <Text style={[styles.webTitle, { color: theme.title }]}>{t('Forgot your password?')}</Text>
                             <Text style={[styles.webBody, { color: theme.secondaryText }]}>
-                                Enter the email you use for Buddy Balance and we will send a recovery link.
+                                {t('Enter the email you use for Buddy Balance and we will send a recovery link.')}
                             </Text>
                         </RNView>
                         {form}
@@ -151,7 +153,7 @@ export default function ForgotPasswordScreen() {
                 <RNView style={styles.content}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                         <ArrowLeft size={20} color={theme.backButton} />
-                        <Text style={[styles.backText, { color: theme.backButton }]}>Back</Text>
+                        <Text style={[styles.backText, { color: theme.backButton }]}>{t('Back')}</Text>
                     </TouchableOpacity>
                     {form}
                 </RNView>

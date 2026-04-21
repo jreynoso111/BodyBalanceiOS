@@ -19,6 +19,7 @@ import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWi
 import { useAuthStore } from '@/store/authStore';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { useI18n } from '@/hooks/useI18n';
 
 type FeedbackTone = 'error' | 'success' | 'info';
 type RegisterStep = 'details' | 'verify';
@@ -26,6 +27,7 @@ type RegisterStep = 'details' | 'verify';
 export default function RegisterScreen() {
     const router = useRouter();
     const { theme } = useAppTheme();
+    const { t } = useI18n();
     const { initialized, user } = useAuthStore();
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
@@ -252,11 +254,11 @@ export default function RegisterScreen() {
             {step === 'details' ? (
                 <>
                     <RNView style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: theme.secondaryText }]}>Full Name</Text>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Full Name')}</Text>
                         <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                             <User size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
-                                placeholder="Enter your full name"
+                                placeholder={t('Enter your full name')}
                                 placeholderTextColor={theme.tertiaryText}
                                 value={fullName}
                                 onChangeText={setFullName}
@@ -267,11 +269,11 @@ export default function RegisterScreen() {
                     </RNView>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: theme.secondaryText }]}>Email Address</Text>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Email Address')}</Text>
                         <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                             <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
-                                placeholder="Enter your email"
+                                placeholder={t('Enter your email')}
                                 placeholderTextColor={theme.tertiaryText}
                                 value={email}
                                 onChangeText={setEmail}
@@ -283,11 +285,11 @@ export default function RegisterScreen() {
                     </RNView>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: theme.secondaryText }]}>Password</Text>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Password')}</Text>
                         <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                             <Lock size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
-                                placeholder="At least 10 chars, mixed case, and number"
+                                placeholder={t('At least 10 chars, mixed case, and number')}
                                 placeholderTextColor={theme.tertiaryText}
                                 value={password}
                                 onChangeText={setPassword}
@@ -298,11 +300,11 @@ export default function RegisterScreen() {
                     </RNView>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: theme.secondaryText }]}>Confirm Password</Text>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Confirm Password')}</Text>
                         <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                             <Lock size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
-                                placeholder="Repeat your password"
+                                placeholder={t('Repeat your password')}
                                 placeholderTextColor={theme.tertiaryText}
                                 value={confirmPassword}
                                 onChangeText={setConfirmPassword}
@@ -318,22 +320,22 @@ export default function RegisterScreen() {
                         style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, busy && { opacity: 0.75 }]}
                     >
                         <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-                            {loading ? 'SENDING CODE...' : 'Send Verification Code'}
+                            {loading ? t('SENDING CODE...') : t('Send Verification Code')}
                         </Text>
                     </TouchableOpacity>
                 </>
             ) : (
                 <>
                     <Text style={[styles.verifyHint, { color: theme.secondaryText }]}>
-                        Enter the code from your inbox. If no code arrives, use sign in or password recovery instead of retrying indefinitely.
+                        {t('Enter the code from your inbox. If no code arrives, use sign in or password recovery instead of retrying indefinitely.')}
                     </Text>
 
                     <RNView style={styles.inputGroup}>
-                        <Text style={[styles.label, { color: theme.secondaryText }]}>Verification Code</Text>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Verification Code')}</Text>
                         <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                             <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                             <TextInput
-                                placeholder="Enter 6-digit code"
+                                placeholder={t('Enter 6-digit code')}
                                 placeholderTextColor={theme.tertiaryText}
                                 value={verificationCode}
                                 onChangeText={setVerificationCode}
@@ -351,7 +353,7 @@ export default function RegisterScreen() {
                         style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, busy && { opacity: 0.75 }]}
                     >
                         <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-                            {verifyingCode ? 'VERIFYING...' : 'Verify Code & Create Account'}
+                            {verifyingCode ? t('VERIFYING...') : t('Verify Code & Create Account')}
                         </Text>
                     </TouchableOpacity>
 
@@ -361,7 +363,7 @@ export default function RegisterScreen() {
                         style={styles.secondaryButton}
                     >
                         <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>
-                            {loading ? 'SENDING...' : 'Resend code'}
+                            {loading ? t('SENDING...') : t('Resend code')}
                         </Text>
                     </TouchableOpacity>
 
@@ -370,7 +372,7 @@ export default function RegisterScreen() {
                         disabled={busy}
                         style={styles.secondaryButton}
                     >
-                        <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>Edit registration details</Text>
+                        <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>{t('Edit registration details')}</Text>
                     </TouchableOpacity>
                 </>
             )}
@@ -396,10 +398,10 @@ export default function RegisterScreen() {
                         <GoogleLogo />
                         <Text style={[styles.googleButtonText, { color: theme.googleButtonText }]}>
                             {googleLoading
-                                ? 'CONNECTING TO GOOGLE...'
+                                ? t('CONNECTING TO GOOGLE...')
                                 : googleUnavailableReason
-                                    ? 'Google Sign In Requires App Build'
-                                    : 'Continue with Google'}
+                                    ? t('Google Sign In Requires App Build')
+                                    : t('Continue with Google')}
                         </Text>
                     </TouchableOpacity>
 
@@ -410,7 +412,7 @@ export default function RegisterScreen() {
             ) : null}
 
             <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.secondaryButton} disabled={busy}>
-                <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>Already have an account? Sign In</Text>
+                <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>{t('Already have an account? Sign In')}</Text>
             </TouchableOpacity>
 
             {feedback ? (
@@ -455,25 +457,25 @@ export default function RegisterScreen() {
             >
                 {Platform.OS === 'web' ? (
                     <WebAuthLayout
-                        eyebrow="Create account"
-                        title="Create a Buddy Balance account that works on mobile and web."
-                        description="Start with email verification, then manage profile details, membership, security, and support from the browser with the same account."
+                        eyebrow={t('Create account')}
+                        title={t('Create a Buddy Balance account that works on mobile and web.')}
+                        description={t('Start with email verification, then manage profile details, membership, security, and support from the browser with the same account.')}
                         highlights={[
-                            'Same sign-in as the app',
-                            'Email code verification',
-                            'Profile and referral setup',
-                            'Membership and support access',
+                            t('Same sign-in as the app'),
+                            t('Email code verification'),
+                            t('Profile and referral setup'),
+                            t('Membership and support access'),
                         ]}
-                        altAction={{ href: '/(auth)/login', label: 'Back to sign in' }}
+                        altAction={{ href: '/(auth)/login', label: t('Back to sign in') }}
                     >
                         <RNView style={styles.webIntro}>
                             <Text style={[styles.webTitle, { color: theme.title }]}>
-                                {step === 'details' ? 'Create your account' : 'Verify your email'}
+                                {step === 'details' ? t('Create your account') : t('Verify your email')}
                             </Text>
                             <Text style={[styles.webBody, { color: theme.secondaryText }]}>
                                 {step === 'details'
-                                    ? 'Set up your account credentials first. Buddy Balance will send a short verification code before final activation.'
-                                    : 'Enter the six-digit code from your inbox. If no code arrives, use sign in or password recovery instead.'}
+                                    ? t('Set up your account credentials first. Buddy Balance will send a short verification code before final activation.')
+                                    : t('Enter the six-digit code from your inbox. If no code arrives, use sign in or password recovery instead.')}
                             </Text>
                         </RNView>
                         <Card style={styles.authCard}>{form}</Card>
@@ -482,12 +484,12 @@ export default function RegisterScreen() {
                 <RNView style={styles.content}>
                     <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.backButton}>
                         <ArrowLeft size={20} color={theme.backButton} />
-                        <Text style={[styles.backText, { color: theme.backButton }]}>Back to login</Text>
+                        <Text style={[styles.backText, { color: theme.backButton }]}>{t('Back to login')}</Text>
                     </TouchableOpacity>
 
                     <RNView style={styles.header}>
                         <BrandLogo size="md" showWordmark centered />
-                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>Create your account</Text>
+                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>{t('Create your account')}</Text>
                     </RNView>
 
                     <Card style={styles.authCard}>{form}</Card>

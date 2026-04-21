@@ -530,27 +530,27 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          <RNView style={[styles.insightRow, compactDashboardLayout && styles.insightRowStacked]}>
-            <Card style={styles.insightCard}>
-              <RNView style={[styles.insightIcon, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+          <RNView style={styles.insightRow}>
+            <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
+              <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
                 <AlertTriangle size={18} color="#F59E0B" />
               </RNView>
-              <Text style={styles.insightValue}>{summary.overdue}</Text>
-              <Text style={styles.insightLabel}>Needs attention</Text>
+              <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{summary.overdue}</Text>
+              <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Needs attention</Text>
             </Card>
-            <Card style={styles.insightCard}>
-              <RNView style={[styles.insightIcon, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+            <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
+              <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
                 <Clock3 size={18} color="#3B82F6" />
               </RNView>
-              <Text style={styles.insightValue}>{summary.dueSoon}</Text>
-              <Text style={styles.insightLabel}>Next 7 days</Text>
+              <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{summary.dueSoon}</Text>
+              <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Next 7 days</Text>
             </Card>
-            <Card style={styles.insightCard}>
-              <RNView style={[styles.insightIcon, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+            <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
+              <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
                 <CheckCircle2 size={18} color="#10B981" />
               </RNView>
-              <Text style={styles.insightValue}>{recordCount}</Text>
-              <Text style={styles.insightLabel}>Shared records</Text>
+              <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{recordCount}</Text>
+              <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Shared records</Text>
             </Card>
           </RNView>
 
@@ -1235,13 +1235,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     backgroundColor: 'transparent',
   },
-  insightRowStacked: {
-    flexWrap: 'wrap',
-  },
   insightCard: {
     flex: 1,
     padding: 14,
-    minWidth: 200,
+    minWidth: 0,
+  },
+  insightCardCompact: {
+    padding: 12,
   },
   insightIcon: {
     width: 34,
@@ -1251,10 +1251,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  insightIconCompact: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
   insightValue: {
     fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
+  },
+  insightValueCompact: {
+    fontSize: 20,
   },
   insightLabel: {
     fontSize: 12,
@@ -1263,6 +1272,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    lineHeight: 14,
+  },
+  insightLabelCompact: {
+    fontSize: 10,
+    letterSpacing: 0.3,
+    lineHeight: 12,
   },
   emptyCard: {
     padding: 22,

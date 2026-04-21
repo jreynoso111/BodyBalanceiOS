@@ -18,7 +18,7 @@ import {
   getPremiumTrialEndsAt,
   PREMIUM_TRIAL_DAYS,
 } from '@/services/subscriptionPlan';
-import { formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
+import { createReferralEmailInvite, formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
 import { useAuthStore } from '@/store/authStore';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 
@@ -163,6 +163,12 @@ export default function SubscriptionScreen() {
 
     setSendingInvite(true);
     try {
+      const inviteReservation = await createReferralEmailInvite(normalizedEmail);
+      if (inviteReservation.error) {
+        Alert.alert('Invite unavailable', inviteReservation.error.message);
+        return;
+      }
+
       const supported = await Linking.canOpenURL(mailtoUrl);
       if (!supported) {
         Alert.alert('Email unavailable', 'This device cannot open the email composer right now.');
@@ -171,6 +177,7 @@ export default function SubscriptionScreen() {
 
       await Linking.openURL(mailtoUrl);
       Alert.alert('Invitation ready', 'Your email app opened with the invitation message prefilled.');
+      setInviteEmail('');
     } catch (error: any) {
       Alert.alert('Could not send invite', error?.message || 'The email composer could not be opened.');
     } finally {
@@ -406,7 +413,7 @@ export default function SubscriptionScreen() {
               {sendingInvite ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Send invite</Text>}
             </TouchableOpacity>
             <Text style={styles.inviteHelper}>
-              This opens your email app with a ready-to-send message that includes a Google Play link placeholder and your friend code.
+              This invite only counts if that same email creates a new account and redeems your friend code.
             </Text>
           </Card>
         ) : null}

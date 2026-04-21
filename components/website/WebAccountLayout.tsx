@@ -8,6 +8,7 @@ import { signOutLocalSession } from '@/services/supabase';
 import { getDeviceLanguage } from '@/constants/i18n';
 import { getPlanLabel } from '@/services/subscriptionPlan';
 import { useAuthStore } from '@/store/authStore';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 type AccountNavItem = {
   href: Href;
@@ -19,6 +20,7 @@ const ACCOUNT_NAV: AccountNavItem[] = [
   { href: '/dashboard', label: 'Dashboard', matches: ['/dashboard'] },
   { href: '/settings', label: 'Account', matches: ['/settings'] },
   { href: '/profile', label: 'Profile', matches: ['/profile'] },
+  { href: '/preferences', label: 'Preferences', matches: ['/preferences'] },
   { href: '/subscription', label: 'Membership', matches: ['/subscription'] },
   { href: '/notifications', label: 'Notifications', matches: ['/notifications'] },
   { href: '/security', label: 'Security', matches: ['/security'] },
@@ -42,7 +44,9 @@ export function WebAccountLayout({
 }) {
   const pathname = usePathname() || '/settings';
   const router = useRouter();
+  const { theme, colorScheme } = useAppTheme();
   const { user, role, planTier, setSession, setUser, setRole, setPlanTier, setLanguage } = useAuthStore();
+  const isDark = colorScheme === 'dark';
   const displayName =
     String(user?.user_metadata?.full_name || '').trim() ||
     String(user?.email || '').split('@')[0] ||
@@ -69,20 +73,20 @@ export function WebAccountLayout({
   };
 
   return (
-    <View style={styles.page}>
+    <View style={[styles.page, { backgroundColor: theme.navigation.background }]}>
       <View style={styles.shell}>
-        <View style={styles.topbar}>
+        <View style={[styles.topbar, { backgroundColor: isDark ? 'rgba(15,23,42,0.88)' : 'rgba(255,255,255,0.84)', borderColor: theme.navigation.border }]}>
           <View>
-            <Text style={styles.productLabel}>Buddy Balance account</Text>
-            <Text style={styles.productSubcopy}>Signed in with the same Supabase account used in the app.</Text>
+            <Text style={[styles.productLabel, { color: theme.title }]}>Buddy Balance account</Text>
+            <Text style={[styles.productSubcopy, { color: theme.secondaryText }]}>Signed in with the same Supabase account used in the app.</Text>
           </View>
           <View style={styles.topbarActions}>
             <Link href="/" asChild>
-              <Pressable style={styles.siteButton}>
-                <Text style={styles.siteButtonText}>Public site</Text>
+              <Pressable style={[styles.siteButton, { borderColor: theme.tintBorder, backgroundColor: theme.navigation.card }]}>
+                <Text style={[styles.siteButtonText, { color: theme.navigation.text }]}>Public site</Text>
               </Pressable>
             </Link>
-            <TouchableOpacity style={styles.signOutButton} onPress={() => void signOut()}>
+            <TouchableOpacity style={[styles.signOutButton, { backgroundColor: theme.primaryButton }]} onPress={() => void signOut()}>
               <Text style={styles.signOutButtonText}>Sign out</Text>
             </TouchableOpacity>
           </View>
@@ -90,24 +94,34 @@ export function WebAccountLayout({
 
         <View style={styles.main}>
           <View style={styles.sidebar}>
-            <View style={styles.profileCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
+            <View style={[styles.profileCard, { backgroundColor: theme.navigation.card, borderColor: theme.tintBorder }]}>
+              <View style={[styles.avatar, { backgroundColor: theme.tintSoft }]}>
+                <Text style={[styles.avatarText, { color: theme.tint }]}>{displayName.charAt(0).toUpperCase()}</Text>
               </View>
-              <Text style={styles.profileName}>{displayName}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-              <Text style={styles.profileMeta}>
+              <Text style={[styles.profileName, { color: theme.title }]}>{displayName}</Text>
+              <Text style={[styles.profileEmail, { color: theme.secondaryText }]}>{user?.email}</Text>
+              <Text style={[styles.profileMeta, { color: theme.tint }]}>
                 {getPlanLabel(planTier)} plan{hasAdminAccess ? ' • Admin' : ''}
               </Text>
             </View>
 
-            <View style={styles.navCard}>
+            <View style={[styles.navCard, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}>
               {ACCOUNT_NAV.map((item) => {
                 const active = matchesPath(pathname, item.matches);
                 return (
                   <Link key={item.label} href={item.href} asChild>
-                    <Pressable style={StyleSheet.flatten([styles.navLink, active && styles.navLinkActive])}>
-                      <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
+                    <Pressable style={StyleSheet.flatten([
+                      styles.navLink,
+                      { backgroundColor: 'transparent' },
+                      active && styles.navLinkActive,
+                      active && { backgroundColor: theme.tintSoft, borderColor: theme.tintBorder },
+                    ])}>
+                      <Text style={[
+                        styles.navText,
+                        { color: theme.secondaryText },
+                        active && styles.navTextActive,
+                        active && { color: theme.navigation.text },
+                      ]}>{item.label}</Text>
                     </Pressable>
                   </Link>
                 );
@@ -116,10 +130,10 @@ export function WebAccountLayout({
           </View>
 
           <View style={styles.content}>
-            <View style={styles.headerCard}>
-              {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.description}>{description}</Text>
+            <View style={[styles.headerCard, { backgroundColor: theme.navigation.card, borderColor: theme.navigation.border }]}>
+              {eyebrow ? <Text style={[styles.eyebrow, { color: theme.tint }]}>{eyebrow}</Text> : null}
+              <Text style={[styles.title, { color: theme.title }]}>{title}</Text>
+              <Text style={[styles.description, { color: theme.secondaryText }]}>{description}</Text>
             </View>
 
             <View style={styles.body}>{children}</View>

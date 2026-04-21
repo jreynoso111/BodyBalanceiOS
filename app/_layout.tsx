@@ -24,6 +24,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { usePaletteStore } from '@/store/paletteStore';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { useI18n } from '@/hooks/useI18n';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -59,6 +60,7 @@ export default function RootLayout() {
 function RootLayoutNav() {
   useAuth(); // Handle redirects based on auth state
   const userId = useAuthStore((state) => state.user?.id);
+  const { t } = useI18n();
   const hydrateThemePreference = useThemeStore((state) => state.hydrateThemePreference);
   const hydratePalettePreference = usePaletteStore((state) => state.hydratePalettePreference);
   const { colorScheme, theme } = useAppTheme();
@@ -111,17 +113,17 @@ function RootLayoutNav() {
           <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)/forgot-password" options={{ title: 'Recover Password' }} />
-          <Stack.Screen name="(auth)/reset-password" options={{ title: 'Reset Password' }} />
+          <Stack.Screen name="(auth)/forgot-password" options={{ title: t('Recover Password') }} />
+          <Stack.Screen name="(auth)/reset-password" options={{ title: t('Reset Password') }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(admin)" options={{ headerShown: false }} />
           <Stack.Screen name="admin" options={{ headerShown: false }} />
-          <Stack.Screen name="loan/[id]" options={{ title: 'Lend/Borrow Details' }} />
-          <Stack.Screen name="new-loan" options={{ title: 'New Lend/Borrow' }} />
+          <Stack.Screen name="loan/[id]" options={{ title: t('Lend/Borrow Details') }} />
+          <Stack.Screen name="new-loan" options={{ title: t('New Lend/Borrow') }} />
           <Stack.Screen
             name="new-contact"
             options={{
-              title: 'New Contact',
+              title: t('New Contact'),
               headerTransparent: false,
               headerStyle: {
                 backgroundColor: theme.navigation.card,
@@ -130,17 +132,18 @@ function RootLayoutNav() {
           />
           <Stack.Screen name="payment" options={{ headerShown: false }} />
           <Stack.Screen name="register-payment" options={{ headerShown: false }} />
-          <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-          <Stack.Screen name="delete-account" options={{ title: 'Delete Account' }} />
-          <Stack.Screen name="subscription" options={{ title: 'Premium' }} />
-          <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
-          <Stack.Screen name="security" options={{ title: 'Security' }} />
-          <Stack.Screen name="help-support" options={{ title: 'Help & Support' }} />
-          <Stack.Screen name="contact" options={{ title: 'Contact Support' }} />
-          <Stack.Screen name="help/[slug]" options={{ title: 'Help' }} />
-          <Stack.Screen name="terms" options={{ title: 'Terms of Service' }} />
-          <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
-          <Stack.Screen name="faq" options={{ title: 'FAQ' }} />
+          <Stack.Screen name="profile" options={{ title: t('Profile') }} />
+          <Stack.Screen name="preferences" options={{ title: t('Preferences') }} />
+          <Stack.Screen name="delete-account" options={{ title: t('Delete Account') }} />
+          <Stack.Screen name="subscription" options={{ title: t('Premium') }} />
+          <Stack.Screen name="notifications" options={{ title: t('Notifications') }} />
+          <Stack.Screen name="security" options={{ title: t('Security') }} />
+          <Stack.Screen name="help-support" options={{ title: t('Help & Support') }} />
+          <Stack.Screen name="contact" options={{ title: t('Contact Support') }} />
+          <Stack.Screen name="help/[slug]" options={{ title: t('Help') }} />
+          <Stack.Screen name="terms" options={{ title: t('Terms of Service') }} />
+          <Stack.Screen name="privacy" options={{ title: t('Privacy Policy') }} />
+          <Stack.Screen name="faq" options={{ title: t('FAQ') }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         </Stack>
         <AppUpdatePrompt />

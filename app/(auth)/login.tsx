@@ -12,12 +12,14 @@ import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWi
 import { useAuthStore } from '@/store/authStore';
 import { WebAuthLayout } from '@/components/website/WebAuthLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
+import { useI18n } from '@/hooks/useI18n';
 
 type FeedbackTone = 'error' | 'success' | 'info';
 
 export default function LoginScreen() {
     const router = useRouter();
     const { theme } = useAppTheme();
+    const { t } = useI18n();
     const { initialized, user } = useAuthStore();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -154,7 +156,7 @@ export default function LoginScreen() {
                 <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
                     <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
                     <TextInput
-                        placeholder="Enter your email"
+                        placeholder={t('Enter your email')}
                         placeholderTextColor={theme.tertiaryText}
                         value={email}
                         onChangeText={setEmail}
@@ -184,7 +186,7 @@ export default function LoginScreen() {
                 disabled={!!authAction}
                 style={styles.forgotButton}
             >
-                <Text style={[styles.forgotButtonText, { color: theme.secondaryButtonText }]}>Forgot your password?</Text>
+                        <Text style={[styles.forgotButtonText, { color: theme.secondaryButtonText }]}>{t('Forgot your password?')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -193,7 +195,7 @@ export default function LoginScreen() {
                 style={[styles.primaryButton, { backgroundColor: theme.primaryButton }]}
             >
                 <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-                    {authAction === 'sign_in' ? 'SIGNING IN...' : 'Sign In'}
+                    {authAction === 'sign_in' ? t('SIGNING IN...') : t('Sign In')}
                 </Text>
             </TouchableOpacity>
 
@@ -217,10 +219,10 @@ export default function LoginScreen() {
                         <GoogleLogo />
                         <Text style={[styles.googleButtonText, { color: theme.googleButtonText }]}>
                             {authAction === 'google'
-                                ? 'CONNECTING TO GOOGLE...'
+                                ? t('CONNECTING TO GOOGLE...')
                                 : googleUnavailableReason
-                                    ? 'Google Sign In Requires App Build'
-                                    : 'Continue with Google'}
+                                    ? t('Google Sign In Requires App Build')
+                                    : t('Continue with Google')}
                         </Text>
                     </TouchableOpacity>
 
@@ -235,7 +237,7 @@ export default function LoginScreen() {
                 disabled={!!authAction}
                 style={styles.secondaryButton}
             >
-                <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>Create New Account</Text>
+                <Text style={[styles.secondaryButtonText, { color: theme.secondaryButtonText }]}>{t('Create New Account')}</Text>
             </TouchableOpacity>
 
             {feedback ? (
@@ -280,22 +282,21 @@ export default function LoginScreen() {
             >
                 {Platform.OS === 'web' ? (
                     <WebAuthLayout
-                        eyebrow="Web sign in"
-                        title="Sign in to the same Buddy Balance account you use in the app."
-                        description="Access your profile, membership, notifications, security controls, and support history from the browser with the same Supabase account."
+                        eyebrow={t('Web sign in')}
+                        title={t('Sign in to the same Buddy Balance account you use in the app.')}
+                        description={t('Access your profile, membership, notifications, security controls, and support history from the browser with the same Supabase account.')}
                         highlights={[
-                            'Shared profile and preferences',
-                            'Membership and referral status',
-                            'Security and notifications',
-                            'Same reset and recovery flow',
+                            t('Shared profile and preferences'),
+                            t('Membership and referral status'),
+                            t('Security and notifications'),
+                            t('Same reset and recovery flow'),
                         ]}
-                        altAction={{ href: '/', label: 'Back to public site' }}
+                        altAction={{ href: '/', label: t('Back to public site') }}
                     >
                         <View style={styles.webIntro}>
-                            <Text style={[styles.webTitle, { color: theme.title }]}>Welcome back</Text>
+                            <Text style={[styles.webTitle, { color: theme.title }]}>{t('Welcome back')}</Text>
                             <Text style={[styles.webBody, { color: theme.secondaryText }]}>
-                                Sign in to manage your account, review your plan, and keep profile details aligned
-                                across mobile and web.
+                                {t('Sign in to manage your account, review your plan, and keep profile details aligned across mobile and web.')}
                             </Text>
                         </View>
                         <Card style={styles.authCard}>{form}</Card>
@@ -306,7 +307,7 @@ export default function LoginScreen() {
                         <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/')}>
                             <BrandLogo size="lg" showWordmark centered />
                         </TouchableOpacity>
-                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>Securely manage what's yours.</Text>
+                        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>{t("Securely manage what's yours.")}</Text>
                     </RNView>
 
                     <Card style={styles.authCard}>{form}</Card>
