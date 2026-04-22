@@ -637,8 +637,8 @@ export default function ContactsScreen() {
                               </RNView>
                               <RNView style={styles.openRecordRight}>
                                 {loan.category === 'money' ? (
-                                  <Text style={[styles.openRecordValue, loan.type === 'lent' ? styles.summaryPositive : styles.summaryNegative]}>
-                                    {getCurrencySymbol(loan.currency || 'USD')}{Math.round(Number(loan.remaining || 0)).toLocaleString()}
+                                  <Text style={[styles.openRecordValue, loan.type === 'lent' ? styles.summaryNegative : styles.summaryPositive]}>
+                                    {`${loan.type === 'lent' ? '-' : '+'}${getCurrencySymbol(loan.currency || 'USD')}${Math.round(Number(loan.remaining || 0)).toLocaleString()}`}
                                   </Text>
                                 ) : (
                                   <Text style={styles.openRecordValue}>Active</Text>
@@ -743,10 +743,10 @@ function buildContactHistory(loans: ContactLoan[], paymentsByLoan: Map<string, C
       title: getLoanCreatedTitle(loan),
       subtitle: loan.due_date ? `Due ${formatSimpleDate(loan.due_date)}` : 'Record created without a due date',
       value: loan.category === 'money'
-        ? `${loan.type === 'lent' ? '+' : '-'}${formatMoneyValue(loan.amount, loan.currency)}`
+        ? `${loan.type === 'lent' ? '-' : '+'}${formatMoneyValue(loan.amount, loan.currency)}`
         : loan.item_name || 'Item',
       valueColor: loan.category === 'money'
-        ? loan.type === 'lent' ? '#10B981' : '#EF4444'
+        ? loan.type === 'lent' ? '#EF4444' : '#10B981'
         : '#6366F1',
     });
 
@@ -801,11 +801,11 @@ function getCompactDetails(contact: ContactItem) {
 
 function getPrimarySummary(balance: number, itemsOwed: number) {
   if (balance !== 0) {
-    return `${balance > 0 ? '+' : '-'}$${Math.abs(Math.round(balance)).toLocaleString()}`;
+    return `${balance > 0 ? '-' : '+'}$${Math.abs(Math.round(balance)).toLocaleString()}`;
   }
 
   if (itemsOwed !== 0) {
-    return `${Math.abs(itemsOwed)} item${Math.abs(itemsOwed) === 1 ? '' : 's'}`;
+    return `${itemsOwed > 0 ? '-' : '+'}${Math.abs(itemsOwed)} item${Math.abs(itemsOwed) === 1 ? '' : 's'}`;
   }
 
   return 'No balance';
@@ -820,8 +820,8 @@ function getSecondarySummary(balance: number, itemsOwed: number, openCount: numb
 }
 
 function getSummaryTone(balance: number, itemsOwed: number) {
-  if (balance > 0 || itemsOwed > 0) return 'positive';
-  if (balance < 0 || itemsOwed < 0) return 'negative';
+  if (balance > 0 || itemsOwed > 0) return 'negative';
+  if (balance < 0 || itemsOwed < 0) return 'positive';
   return 'neutral';
 }
 

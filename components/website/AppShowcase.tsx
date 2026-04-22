@@ -222,7 +222,7 @@ function HomeScreen() {
           <Text style={styles.balanceTagText}>YOU LENT MORE</Text>
         </View>
         <Text style={styles.balanceLabel}>OPEN BALANCE</Text>
-        <Text style={styles.balanceValue}>+$3,650</Text>
+        <Text style={styles.balanceValue}>-$3,650</Text>
         <Text style={styles.balanceCopy}>Friends owe you more than you owe them.</Text>
 
         <View style={styles.balanceSplit}>

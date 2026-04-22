@@ -796,7 +796,7 @@ export default function LoanDetailScreen() {
                             {loan.category === 'item' ? (
                                 <Box size={32} color="#6366F1" />
                             ) : (
-                                <Wallet size={32} color={loan.type === 'lent' ? '#10B981' : '#EF4444'} />
+                                <Wallet size={32} color={loan.type === 'lent' ? '#EF4444' : '#10B981'} />
                             )}
                         </RNView>
                         <RNView style={styles.headerInfo}>
@@ -828,18 +828,18 @@ export default function LoanDetailScreen() {
 
                     <RNText style={styles.amountLabel}>{t('Still open')}</RNText>
                     <Text style={styles.amountText}>
-                        {loan.category === 'item' ? loan.item_name : `${getCurrencySymbol(loan.currency)}${remaining.toLocaleString()}`}
+                        {loan.category === 'item' ? loan.item_name : `${loan.type === 'lent' ? '-' : '+'}${getCurrencySymbol(loan.currency)}${remaining.toLocaleString()}`}
                     </Text>
 
                     {loan.category === 'money' && (
                         <RNView style={styles.balanceBreakdown}>
                             <RNView style={styles.breakdownItem}>
                                 <RNText style={styles.breakdownLabel}>{t('Paid')}</RNText>
-                                <Text style={styles.breakdownValue}>{getCurrencySymbol(loan.currency)}{totalPaid.toLocaleString()}</Text>
+                                <Text style={styles.breakdownValue}>{`${loan.type === 'lent' ? '+' : '-'}${getCurrencySymbol(loan.currency)}${totalPaid.toLocaleString()}`}</Text>
                             </RNView>
                             <RNView style={[styles.breakdownItem, { alignItems: 'flex-end' }]}>
                                 <RNText style={styles.breakdownLabel}>{t('Original Total')}</RNText>
-                                <Text style={styles.breakdownValue}>{getCurrencySymbol(loan.currency)}{safeLoanAmount.toLocaleString()}</Text>
+                                <Text style={styles.breakdownValue}>{`${loan.type === 'lent' ? '-' : '+'}${getCurrencySymbol(loan.currency)}${safeLoanAmount.toLocaleString()}`}</Text>
                             </RNView>
                         </RNView>
                     )}

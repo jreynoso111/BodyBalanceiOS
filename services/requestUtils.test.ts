@@ -46,7 +46,7 @@ describe('requestUtils', () => {
     ]);
 
     expect(formatMergeChoiceSummary(mergeRequest.request_payload.user_a_summary)).toBe(
-      '3 records • 2 open • 1 payment • 120 owed to you • 1 items you owe'
+      '3 records • 2 open • 1 payment • -120 owed to you • +1 items you owe'
     );
   });
 

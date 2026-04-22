@@ -11,6 +11,7 @@ import { scheduleLoanReminderForUser } from '@/services/notificationService';
 import { CURRENCIES, getCurrencySymbol } from '@/constants/Currencies';
 import { getOrCreateUserPreferences, sanitizePreferredCurrencies, updateUserPreferences } from '@/services/userPreferences';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { AppLanguage } from '@/constants/i18n';
 
 const REMINDER_OPTIONS = [
   { label: 'Off', value: 'none' },
@@ -21,12 +22,6 @@ const REMINDER_OPTIONS = [
   { label: 'Custom', value: 'custom' },
 ] as const;
 
-const DUE_PRESETS = [
-  { label: 'Today', days: 0 },
-  { label: '7 days', days: 7 },
-  { label: '30 days', days: 30 },
-];
-
 const TRANSACTION_PRESETS = [
   {
     key: 'lent-money',
@@ -34,7 +29,7 @@ const TRANSACTION_PRESETS = [
     subtitle: 'Someone should pay you back.',
     category: 'money' as const,
     type: 'lent' as const,
-    accent: '#10B981',
+    accent: '#EF4444',
     icon: Wallet,
   },
   {
@@ -43,7 +38,7 @@ const TRANSACTION_PRESETS = [
     subtitle: 'You need to pay this back.',
     category: 'money' as const,
     type: 'borrowed' as const,
-    accent: '#EF4444',
+    accent: '#10B981',
     icon: Wallet,
   },
   {
@@ -52,7 +47,7 @@ const TRANSACTION_PRESETS = [
     subtitle: 'You want this item back.',
     category: 'item' as const,
     type: 'lent' as const,
-    accent: '#0F172A',
+    accent: '#EF4444',
     icon: Box,
   },
   {
@@ -61,7 +56,7 @@ const TRANSACTION_PRESETS = [
     subtitle: 'You need to return this item.',
     category: 'item' as const,
     type: 'borrowed' as const,
-    accent: '#6366F1',
+    accent: '#10B981',
     icon: Box,
   },
 ];
@@ -69,7 +64,7 @@ const TRANSACTION_PRESETS = [
 type ReminderFrequency = 'none' | 'daily' | 'weekly' | 'custom' | 'monthly' | 'yearly';
 
 export default function NewLoanScreen() {
-  const { user } = useAuthStore();
+  const { user, language } = useAuthStore();
   const router = useRouter();
   const { contactId: initialContactIdParam } = useLocalSearchParams<{ contactId?: string | string[] }>();
   const initialContactId = Array.isArray(initialContactIdParam) ? initialContactIdParam[0] : initialContactIdParam;
@@ -92,6 +87,9 @@ export default function NewLoanScreen() {
   const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
   const [contactPickerVisible, setContactPickerVisible] = useState(false);
   const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [primaryEditorVisible, setPrimaryEditorVisible] = useState(false);
+  const [duePickerVisible, setDuePickerVisible] = useState(false);
+  const [dueDateInput, setDueDateInput] = useState('');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const base64StringRef = useRef<string | null>(null);
 
@@ -107,6 +105,10 @@ export default function NewLoanScreen() {
       setDueDate(getDateWithOffset(30));
     }
   }, [dueDate]);
+
+  useEffect(() => {
+    setDueDateInput(formatDateInputValue(dueDate, language));
+  }, [dueDate, language]);
 
   const loadCurrencyPreferences = async () => {
     if (!user?.id) return;
@@ -200,7 +202,8 @@ export default function NewLoanScreen() {
 
     const parsedAmount = parseFloat(amount);
     const normalizedItemName = itemName.trim();
-    const normalizedDueDate = dueDate.trim();
+    const parsedManualDueDate = parseDateInput(dueDateInput, language);
+    const normalizedDueDate = (parsedManualDueDate || dueDate).trim();
     const effectiveDueDate = normalizedDueDate || getDefaultDueDate();
     const parsedReminderInterval = parseInt(reminderInterval, 10) || 1;
 
@@ -216,8 +219,10 @@ export default function NewLoanScreen() {
       Alert.alert('Error', 'Contact is required.');
       return;
     }
-    if (normalizedDueDate && Number.isNaN(new Date(normalizedDueDate).getTime())) {
-      Alert.alert('Error', 'Due date must be a valid date (YYYY-MM-DD).');
+    const dueDatePlaceholder = language === 'en' ? 'MM/DD/YYYY' : 'DD/MM/YYYY';
+
+    if (dueDateInput.trim() && !parsedManualDueDate) {
+      Alert.alert('Error', `Due date must be a valid date (${dueDatePlaceholder}).`);
       return;
     }
 
@@ -364,23 +369,24 @@ export default function NewLoanScreen() {
     if (!normalizedContactSearch) return true;
     return contact.name.toLowerCase().includes(normalizedContactSearch);
   });
+  const dueDatePlaceholder = language === 'en' ? 'MM/DD/YYYY' : 'DD/MM/YYYY';
   const dueLabel = dueDate ? formatDueLabel(dueDate) : 'No due date selected';
   const heroGradient: [string, string, string] =
     selectedPreset.key === 'lent-money'
-      ? ['#F8FAFC', '#ECFDF5', '#D1FAE5']
+      ? ['#FFF7F7', '#FEE2E2', '#FECACA']
       : selectedPreset.key === 'borrowed-money'
-        ? ['#FFF7F7', '#FEE2E2', '#FDE2E8']
+        ? ['#F0FDF4', '#DCFCE7', '#BBF7D0']
         : selectedPreset.key === 'lent-item'
-          ? ['#F8FAFC', '#F1F5F9', '#E2E8F0']
+          ? ['#FFF7F7', '#FEE2E2', '#FECACA']
           : ['#F5F3FF', '#EEF2FF', '#E0E7FF'];
   const categoryLabel = category === 'money' ? 'Money record' : 'Item record';
   const directionLabel = type === 'lent' ? 'You are giving' : 'You are receiving';
   const contactStatusLabel = selectedContact
     ? selectedContactIsLinked
-      ? 'Shared contact'
+      ? 'Linked contact'
       : selectedContactIsPending
-        ? 'Invite pending'
-        : 'Private contact'
+        ? 'Invitation pending'
+        : 'Unlinked contact'
     : 'No contact selected';
   const heroPrimaryValue = category === 'money'
     ? amount
@@ -388,7 +394,7 @@ export default function NewLoanScreen() {
       : `${getCurrencySymbol(currency)}0.00`
     : itemName || 'Unnamed item';
   const heroSecondaryValue = selectedContact?.name || 'Choose a contact';
-  const summaryTone = type === 'lent' ? styles.summaryAccentPositive : styles.summaryAccentNegative;
+  const summaryTone = type === 'lent' ? styles.summaryAccentNegative : styles.summaryAccentPositive;
 
   return (
     <Screen style={styles.container}>
@@ -429,28 +435,44 @@ export default function NewLoanScreen() {
 
             <Text style={styles.heroTitle}>{selectedPreset.title}</Text>
             <Text style={styles.heroText}>{selectedPreset.subtitle}</Text>
+            <Text style={styles.heroEditHint}>Tap the cards below to edit this transaction.</Text>
 
             <RNView style={styles.heroStatsRow}>
-              <RNView style={styles.heroStatCard}>
+              <TouchableOpacity style={styles.heroStatCard} onPress={() => setPrimaryEditorVisible(true)} activeOpacity={0.9}>
                 <Text style={styles.heroStatLabel}>{category === 'money' ? 'Amount' : 'Item'}</Text>
-                <Text style={styles.heroStatValue}>{heroPrimaryValue}</Text>
-              </RNView>
-              <RNView style={styles.heroStatCard}>
+                <Text style={styles.heroStatValue} numberOfLines={1}>{heroPrimaryValue}</Text>
+                <Text style={styles.heroStatEditText}>{category === 'money' ? 'Edit amount and currency' : 'Edit item name'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.heroStatCard} onPress={() => setContactPickerVisible(true)} activeOpacity={0.9}>
                 <Text style={styles.heroStatLabel}>Contact</Text>
                 <Text style={styles.heroStatValue} numberOfLines={1}>{heroSecondaryValue}</Text>
-              </RNView>
+                <Text style={styles.heroStatEditText}>Choose who is involved</Text>
+              </TouchableOpacity>
             </RNView>
 
             <RNView style={styles.heroMetaRow}>
-              <RNView style={styles.heroMetaChip}>
+              <TouchableOpacity
+                style={styles.heroMetaChip}
+                onPress={() => applyPreset(category, type === 'lent' ? 'borrowed' : 'lent')}
+                activeOpacity={0.85}
+              >
                 <Text style={styles.heroMetaChipText}>{directionLabel}</Text>
-              </RNView>
-              <RNView style={styles.heroMetaChip}>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.heroMetaChip} onPress={() => setDuePickerVisible(true)} activeOpacity={0.85}>
                 <Text style={styles.heroMetaChipText}>{dueLabel}</Text>
-              </RNView>
-              <RNView style={styles.heroMetaChip}>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.heroMetaChip}
+                disabled={!selectedContact || selectedContactIsLinked || selectedContactIsPending}
+                onPress={() => {
+                  if (selectedContact && !selectedContactIsLinked && !selectedContactIsPending) {
+                    router.push(`/new-contact?id=${selectedContact.id}&mode=friend`);
+                  }
+                }}
+                activeOpacity={0.85}
+              >
                 <Text style={styles.heroMetaChipText}>{contactStatusLabel}</Text>
-              </RNView>
+              </TouchableOpacity>
             </RNView>
           </LinearGradient>
 
@@ -479,143 +501,44 @@ export default function NewLoanScreen() {
             })}
           </View>
 
-          <Card style={[styles.sectionCard, styles.sectionCardElevated]}>
-            <RNView style={[styles.sectionAccentBar, { backgroundColor: selectedPreset.accent }]} />
-            <Text style={styles.sectionTitle}>Main details</Text>
-            <Text style={styles.sectionSubtitle}>{selectedPreset.subtitle}</Text>
-
-            {category === 'money' ? (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Amount</Text>
-                <View style={styles.amountInputContainer}>
-                  <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
-                  <TextInput
-                    placeholder="0.00"
-                    placeholderTextColor="#CBD5E1"
-                    value={amount}
-                    onChangeText={setAmount}
-                    keyboardType="decimal-pad"
-                    style={styles.amountInput}
-                  />
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inlineList}>
-                  {availableCurrencies.map((code) => (
-                    <TouchableOpacity
-                      key={code}
-                      onPress={() => setCurrency(code)}
-                      style={[styles.smallChip, currency === code && styles.smallChipActive]}
-                    >
-                      <Text style={[styles.smallChipText, currency === code && styles.smallChipTextActive]}>{code}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity style={styles.addChip} onPress={openAddCurrencyPicker}>
-                    <Plus size={14} color="#475569" />
-                    <Text style={styles.addChipText}>Add currency</Text>
+          {contacts.length === 0 ? (
+            <Card style={[styles.sectionCard, styles.sectionCardElevated]}>
+              <RNView style={[styles.sectionAccentBar, { backgroundColor: '#0F172A' }]} />
+              <Text style={styles.sectionTitle}>Contact needed</Text>
+              <Text style={styles.sectionSubtitle}>Add a person first so this record has someone attached to it.</Text>
+              <Card style={styles.emptyInlineCard}>
+                <Text style={styles.emptyInlineText}>Use the friend option only if they also use Buddy Balance. Otherwise keep it as a private contact.</Text>
+                <RNView style={styles.emptyInlineActions}>
+                  <TouchableOpacity style={styles.emptyInlineButton} onPress={() => router.push('/new-contact?mode=friend')}>
+                    <UserPlus size={16} color="#FFFFFF" />
+                    <Text style={styles.emptyInlineButtonText}>Link friend</Text>
                   </TouchableOpacity>
-                </ScrollView>
-              </View>
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Item name</Text>
-                <TextInput
-                  placeholder={type === 'lent' ? 'What did you give?' : 'What did you receive?'}
-                  placeholderTextColor="#94A3B8"
-                  value={itemName}
-                  onChangeText={setItemName}
-                  style={styles.input}
-                />
-              </View>
-            )}
-
-            <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Contact</Text>
-                <RNView style={styles.labelActions}>
-                  <TouchableOpacity onPress={() => router.push('/new-contact?mode=friend')}>
-                    <Text style={styles.linkText}>+ Link friend</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => router.push('/new-contact')}>
-                    <Text style={styles.linkTextMuted}>+ Add contact</Text>
+                  <TouchableOpacity style={styles.emptyInlineSecondaryButton} onPress={() => router.push('/new-contact')}>
+                    <Text style={styles.emptyInlineSecondaryButtonText}>Add contact</Text>
                   </TouchableOpacity>
                 </RNView>
-              </View>
-              {contacts.length === 0 ? (
-                <Card style={styles.emptyInlineCard}>
-                  <Text style={styles.emptyInlineText}>Add a contact first so this record has someone attached to it. Use the friend option only if they also use Buddy Balance.</Text>
-                  <RNView style={styles.emptyInlineActions}>
-                    <TouchableOpacity style={styles.emptyInlineButton} onPress={() => router.push('/new-contact?mode=friend')}>
-                      <UserPlus size={16} color="#FFFFFF" />
-                      <Text style={styles.emptyInlineButtonText}>Link friend</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.emptyInlineSecondaryButton} onPress={() => router.push('/new-contact')}>
-                      <Text style={styles.emptyInlineSecondaryButtonText}>Add contact</Text>
-                    </TouchableOpacity>
-                  </RNView>
-                </Card>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.selectInput, contactPickerVisible && styles.selectInputActive]}
-                  onPress={() => setContactPickerVisible(true)}
-                >
-                  <RNView style={styles.selectInputLeft}>
-                    <Text style={styles.selectInputEyebrow}>Contact</Text>
-                    <Text style={[styles.selectInputText, !selectedContact && styles.selectInputPlaceholder]}>
-                      {selectedContact ? selectedContact.name : 'Add contact'}
-                    </Text>
-                  </RNView>
-                  <ChevronDown size={18} color="#64748B" />
-                </TouchableOpacity>
-              )}
-              {selectedContact ? (
-                <Card style={[styles.contactStatusCard, selectedContactIsLinked ? styles.contactStatusCardLinked : styles.contactStatusCardPrivate]}>
-                  <Text style={styles.contactStatusTitle}>
-                    {selectedContactIsLinked ? 'Shared friend linked' : selectedContactIsPending ? 'Friend invitation sent' : 'Private contact'}
-                  </Text>
-                  <Text style={styles.contactStatusText}>
-                    {selectedContactIsLinked
-                      ? 'This person is linked inside the app, so they can confirm and follow shared records.'
-                      : selectedContactIsPending
-                      ? 'Your invitation has been sent. Shared confirmations will start as soon as they accept.'
-                      : 'This record stays private until you link this contact with a friend code.'}
-                  </Text>
-                  {!selectedContactIsLinked && !selectedContactIsPending ? (
-                    <TouchableOpacity onPress={() => router.push(`/new-contact?id=${selectedContact.id}&mode=friend`)}>
-                      <Text style={styles.contactStatusLink}>Link this contact</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </Card>
-              ) : null}
-            </View>
-          </Card>
+              </Card>
+            </Card>
+          ) : null}
 
-          <Card style={[styles.sectionCard, styles.sectionCardElevated]}>
-            <RNView style={[styles.sectionAccentBar, { backgroundColor: '#F59E0B' }]} />
-            <Text style={styles.sectionTitle}>Due date</Text>
-            <Text style={styles.sectionSubtitle}>{dueLabel}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inlineList}>
-              {DUE_PRESETS.map((preset) => {
-                const presetDate = getDateWithOffset(preset.days);
-                const active = dueDate === presetDate;
-                return (
-                  <TouchableOpacity
-                    key={preset.label}
-                    style={[styles.smallChip, active && styles.smallChipActive]}
-                    onPress={() => setDueDate(presetDate)}
-                  >
-                    <Text style={[styles.smallChipText, active && styles.smallChipTextActive]}>{preset.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TextInput
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#94A3B8"
-              value={dueDate}
-              onChangeText={setDueDate}
-              autoCapitalize="none"
-              style={styles.input}
-            />
-          </Card>
+          {selectedContact ? (
+            <Card style={[styles.sectionCard, styles.sectionCardElevated, styles.contactSummaryCard]}>
+              <RNView style={[styles.sectionAccentBar, { backgroundColor: selectedContactIsLinked ? '#10B981' : '#F59E0B' }]} />
+              <Text style={styles.sectionTitle}>Contact status</Text>
+              <Text style={styles.sectionSubtitle}>
+                {selectedContactIsLinked
+                  ? 'This contact is linked inside the app.'
+                  : selectedContactIsPending
+                  ? 'This invitation is still pending.'
+                  : 'This record stays private until you link the contact.'}
+              </Text>
+              {!selectedContactIsLinked && !selectedContactIsPending ? (
+                <TouchableOpacity onPress={() => router.push(`/new-contact?id=${selectedContact.id}&mode=friend`)}>
+                  <Text style={styles.contactStatusLink}>Link this contact</Text>
+                </TouchableOpacity>
+              ) : null}
+            </Card>
+          ) : null}
 
           <TouchableOpacity style={styles.moreToggle} onPress={() => setShowMoreOptions((current) => !current)}>
             <RNView style={styles.moreToggleLeft}>
@@ -711,6 +634,139 @@ export default function NewLoanScreen() {
               {selectedContact ? contactStatusLabel : 'Choose a contact before saving'} • {dueLabel}
             </Text>
           </Card>
+
+          <Modal
+            animationType="slide"
+            transparent
+            visible={primaryEditorVisible}
+            onRequestClose={() => setPrimaryEditorVisible(false)}
+          >
+            <RNView style={styles.currencyModalOverlay}>
+              <Card style={styles.editorModalCard}>
+                <RNView style={styles.contactModalHeader}>
+                  <Text style={styles.currencyModalTitle}>{category === 'money' ? 'Edit amount' : 'Edit item'}</Text>
+                  <TouchableOpacity
+                    style={styles.contactModalCloseButton}
+                    onPress={() => setPrimaryEditorVisible(false)}
+                  >
+                    <Text style={styles.contactModalCloseButtonText}>Done</Text>
+                  </TouchableOpacity>
+                </RNView>
+
+                {category === 'money' ? (
+                  <>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Amount</Text>
+                      <View style={styles.amountInputContainer}>
+                        <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
+                        <TextInput
+                          placeholder="0.00"
+                          placeholderTextColor="#CBD5E1"
+                          value={amount}
+                          onChangeText={setAmount}
+                          keyboardType="decimal-pad"
+                          style={styles.amountInput}
+                        />
+                      </View>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inlineList}>
+                      {availableCurrencies.map((code) => (
+                        <TouchableOpacity
+                          key={code}
+                          onPress={() => setCurrency(code)}
+                          style={[styles.smallChip, currency === code && styles.smallChipActive]}
+                        >
+                          <Text style={[styles.smallChipText, currency === code && styles.smallChipTextActive]}>{code}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity style={styles.addChip} onPress={openAddCurrencyPicker}>
+                        <Plus size={14} color="#475569" />
+                        <Text style={styles.addChipText}>Add currency</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+                  </>
+                ) : (
+                  <View style={styles.inputGroupNoMargin}>
+                    <Text style={styles.label}>Item name</Text>
+                    <TextInput
+                      placeholder={type === 'lent' ? 'What did you give?' : 'What did you receive?'}
+                      placeholderTextColor="#94A3B8"
+                      value={itemName}
+                      onChangeText={setItemName}
+                      style={styles.input}
+                    />
+                  </View>
+                )}
+              </Card>
+            </RNView>
+          </Modal>
+
+          <Modal
+            animationType="slide"
+            transparent
+            visible={duePickerVisible}
+            onRequestClose={() => setDuePickerVisible(false)}
+          >
+            <RNView style={styles.currencyModalOverlay}>
+              <Card style={styles.editorModalCard}>
+                <RNView style={styles.contactModalHeader}>
+                  <Text style={styles.currencyModalTitle}>Choose due date</Text>
+                  <TouchableOpacity
+                    style={styles.contactModalCloseButton}
+                    onPress={() => setDuePickerVisible(false)}
+                  >
+                    <Text style={styles.contactModalCloseButtonText}>Done</Text>
+                  </TouchableOpacity>
+                </RNView>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Custom date</Text>
+                  <TextInput
+                    placeholder={dueDatePlaceholder}
+                    placeholderTextColor="#94A3B8"
+                    value={dueDateInput}
+                    onChangeText={(value) => {
+                      setDueDateInput(value);
+                      const parsedValue = parseDateInput(value, language);
+                      if (parsedValue) {
+                        setDueDate(parsedValue);
+                      }
+                    }}
+                    autoCapitalize="none"
+                    style={styles.input}
+                  />
+                </View>
+
+                <ScrollView
+                  style={styles.dueOptionScroll}
+                  contentContainerStyle={styles.dueOptionList}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {EXTENDED_DUE_PRESETS.map((preset) => {
+                    const presetDate = getDateWithOffset(preset.days);
+                    const active = dueDate === presetDate;
+                    return (
+                      <TouchableOpacity
+                        key={preset.label}
+                        style={[styles.dueOptionRow, active && styles.dueOptionRowActive]}
+                        onPress={() => {
+                          setDueDate(presetDate);
+                          setDuePickerVisible(false);
+                        }}
+                      >
+                        <View style={styles.dueOptionTextWrap}>
+                          <Text style={styles.dueOptionTitle}>{preset.label}</Text>
+                          <Text style={styles.dueOptionSubtitle}>{formatDueLabel(presetDate)}</Text>
+                        </View>
+                        {active ? <Check size={18} color="#4F46E5" /> : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </Card>
+            </RNView>
+          </Modal>
 
           <Modal
             animationType="slide"
@@ -868,6 +924,57 @@ function formatDueLabel(dateString: string) {
   return `${Math.abs(diffDays)} days overdue`;
 }
 
+function formatDateInputValue(isoDate: string, language: AppLanguage) {
+  const normalizedDate = isoDate.trim();
+  if (!normalizedDate) return '';
+
+  const [year, month, day] = normalizedDate.split('-');
+  if (!year || !month || !day) return normalizedDate;
+
+  if (language === 'en') {
+    return `${month}/${day}/${year}`;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateInput(input: string, language: AppLanguage) {
+  const normalizedInput = input.trim();
+  if (!normalizedInput) return '';
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalizedInput)) {
+    return isValidIsoDate(normalizedInput) ? normalizedInput : '';
+  }
+
+  const match = normalizedInput.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (!match) return '';
+
+  const [, firstPart, secondPart, year] = match;
+  const month = language === 'en' ? firstPart : secondPart;
+  const day = language === 'en' ? secondPart : firstPart;
+  const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  return isValidIsoDate(isoDate) ? isoDate : '';
+}
+
+function isValidIsoDate(isoDate: string) {
+  const [year, month, day] = isoDate.split('-').map((value) => Number(value));
+  if (!year || !month || !day) return false;
+
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year
+    && candidate.getUTCMonth() === month - 1
+    && candidate.getUTCDate() === day;
+}
+
+const EXTENDED_DUE_PRESETS = [
+  { label: 'Tomorrow', days: 1 },
+  { label: '7 days', days: 7 },
+  { label: '14 days', days: 14 },
+  { label: '30 days', days: 30 },
+  { label: '60 days', days: 60 },
+  { label: '90 days', days: 90 },
+];
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -947,6 +1054,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#475569',
   },
+  heroEditHint: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#475569',
+    fontWeight: '600',
+  },
   heroStatsRow: {
     flexDirection: 'row',
     gap: 12,
@@ -974,6 +1088,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  heroStatEditText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6366F1',
   },
   heroMetaRow: {
     flexDirection: 'row',
@@ -1099,6 +1219,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: '#64748B',
     marginBottom: 18,
+  },
+  contactSummaryCard: {
+    backgroundColor: '#FFFFFF',
   },
   inputGroup: {
     marginBottom: 18,
@@ -1463,6 +1586,10 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: '70%',
   },
+  editorModalCard: {
+    padding: 20,
+    maxHeight: '70%',
+  },
   contactModalCard: {
     padding: 20,
     maxHeight: '78%',
@@ -1540,6 +1667,45 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
     backgroundColor: 'transparent',
+  },
+  dueOptionScroll: {
+    maxHeight: 320,
+  },
+  dueOptionList: {
+    gap: 10,
+    backgroundColor: 'transparent',
+    paddingBottom: 4,
+  },
+  dueOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  dueOptionRowActive: {
+    borderColor: '#6366F1',
+    backgroundColor: '#EEF2FF',
+  },
+  dueOptionTextWrap: {
+    flex: 1,
+    marginRight: 12,
+    backgroundColor: 'transparent',
+  },
+  dueOptionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  dueOptionSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#64748B',
   },
   contactModalPrimaryAction: {
     borderRadius: 16,

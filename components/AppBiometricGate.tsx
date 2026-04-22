@@ -32,7 +32,7 @@ function mapBiometricError(errorCode?: string, label?: string) {
 export function AppBiometricGate() {
   const pathname = usePathname();
   const { initialized, session } = useAuthStore();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [lockEnabled, setLockEnabled] = useState(false);
   const [requiresUnlock, setRequiresUnlock] = useState(false);
   const [shouldPrompt, setShouldPrompt] = useState(false);
@@ -63,6 +63,7 @@ export function AppBiometricGate() {
       }
 
       try {
+        setLoading(true);
         const cachedEnabled = await getCachedBiometricLockEnabled(userId);
         if (!mounted) return;
 

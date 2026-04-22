@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
-import { corsHeaders } from '../_shared/cors.ts';
+import { buildPrivateCorsHeaders, isAllowedPrivateOrigin, normalizeOrigin } from '../_shared/cors.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -23,11 +23,11 @@ function normalizeResetRedirect(rawValue: string) {
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-function json(body: Record<string, unknown>, status = 200) {
+function json(body: Record<string, unknown>, status = 200, origin: string | null = null) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...buildPrivateCorsHeaders(origin),
       'Content-Type': 'application/json',
     },
   });
@@ -71,12 +71,18 @@ async function assertAdmin(authToken: string) {
 }
 
 Deno.serve(async (req) => {
+  const origin = normalizeOrigin(req.headers.get('origin'));
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: buildPrivateCorsHeaders(origin) });
+  }
+
+  if (!isAllowedPrivateOrigin(origin)) {
+    return json({ error: 'Origin not allowed.' }, 403, origin);
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return json({ error: 'Missing Supabase function secrets.' }, 500);
+    return json({ error: 'Missing Supabase function secrets.' }, 500, origin);
   }
 
   try {
@@ -89,12 +95,12 @@ Deno.serve(async (req) => {
       const redirectTo = normalizeResetRedirect(String(body?.redirectTo || DEFAULT_RESET_REDIRECT_TO));
 
       if (!email) {
-        return json({ error: 'Missing email.' }, 400);
+        return json({ error: 'Missing email.' }, 400, origin);
       }
 
       const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) {
-        return json({ error: error.message }, 500);
+        return json({ error: error.message }, 500, origin);
       }
 
       return json({
@@ -102,33 +108,33 @@ Deno.serve(async (req) => {
         action,
         email,
         redirectTo,
-      });
+      }, 200, origin);
     }
 
     if (action === 'delete_user') {
       const userId = String(body?.userId || '').trim();
       if (!userId) {
-        return json({ error: 'Missing userId.' }, 400);
+        return json({ error: 'Missing userId.' }, 400, origin);
       }
       if (userId === adminUserId) {
-        return json({ error: 'Admins cannot delete their own account here.' }, 400);
+        return json({ error: 'Admins cannot delete their own account here.' }, 400, origin);
       }
 
       const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (error) {
-        return json({ error: error.message }, 500);
+        return json({ error: error.message }, 500, origin);
       }
 
       return json({
         ok: true,
         action,
         userId,
-      });
+      }, 200, origin);
     }
 
-    return json({ error: 'Unsupported action.' }, 400);
+    return json({ error: 'Unsupported action.' }, 400, origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return json({ error: message }, 500);
+    return json({ error: message }, 500, origin);
   }
 });

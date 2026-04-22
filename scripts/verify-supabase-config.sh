@@ -97,6 +97,10 @@ report_missing_group "google-play" \
   "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL" \
   "GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY" || failures=$((failures + 1))
 
+print_section "Private edge functions"
+report_missing_group "private-functions" \
+  "PRIVATE_FUNCTION_ALLOWED_ORIGINS" || failures=$((failures + 1))
+
 print_section "Summary"
 if ((failures == 0)); then
   echo "  All required Supabase secrets are present."

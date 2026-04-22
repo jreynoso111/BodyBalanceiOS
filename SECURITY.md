@@ -57,6 +57,18 @@ For Android billing validation, configure these Supabase secrets:
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY`
 
+For authenticated/admin edge functions, configure:
+
+- `PRIVATE_FUNCTION_ALLOWED_ORIGINS`
+
+If omitted, the functions default to:
+
+- `https://buddybalance.net`
+- `https://www.buddybalance.net`
+- localhost development origins
+
+Requests without an `Origin` header are still accepted so native mobile and server-to-server calls continue to work.
+
 ## 3) Session storage
 
 - On mobile, auth session tokens are stored in `expo-secure-store` (encrypted at rest).

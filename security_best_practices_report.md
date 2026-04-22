@@ -1,39 +1,99 @@
-# Buddy Balance Security and Readiness Review
+# Security Best Practices Report
 
 ## Executive Summary
 
-The codebase is materially stronger than earlier in the audit cycle: manual Premium entitlement changes are blocked, public contact now fails closed when CAPTCHA secrets are missing, account deletion exists in-app, public mobile auth flows now go through a rate-limited Edge Function, iOS no longer exposes a live Android-only billing CTA, and `eas.json` includes an Android `submit` profile. I did not find a remaining critical code-level blocker. The main remaining gap is operational: final Android launch-sensitive paths still need physical-device validation and Google Play Console setup.
+The project is in decent shape on the basics: frontend Supabase credentials are constrained to publishable keys, `.env` is ignored, RLS policy scaffolding exists, and `npm audit --omit=dev` returned zero known production dependency vulnerabilities at the time of review.
 
-## Low Severity
+I found two security issues worth addressing before calling the app fully hardened:
 
-### 1. Physical-device Android validation is still required for the final launch-sensitive paths
+1. `revenuecat-sync` can become an unauthenticated profile-plan mutation endpoint if the webhook auth token is not configured.
+2. The biometric lock gate can briefly fail open while it is still resolving remote lock state, which weakens the privacy guarantee of the app lock.
 
-- Rule ID: QA-DEVICE-001
-- Severity: Low
-- Location: `/Users/jreynoso/I Got You iOS/release_smoke_checklist.md:16`
-- Evidence:
-  - The release checklist still requires real-device checks for Google Play purchase, push delivery, and other device-dependent flows.
-  - The Android emulator in this environment does not provide stable host-webcam QR scanning for a physical QR code.
-- Impact:
-  - The app can look code-complete while still missing real-world validation for the exact Android-only flows that matter at launch.
-- Fix:
-  - Run the documented smoke checklist on a physical Android device before release.
-- Mitigation:
-  - Treat Android physical-device validation as a release gate, not an optional post-check.
-- False positive notes:
-  - This is an operational readiness gap, not a source-code bug.
+## High Severity
 
-## Notable Improvements Already Landed
+### SEC-1: `revenuecat-sync` accepts unauthenticated webhook-style writes when `REVENUECAT_WEBHOOK_AUTH_TOKEN` is unset
 
-- Manual admin Premium toggles are disabled in UI and backend.
-- Public contact no longer silently skips CAPTCHA in production when the Turnstile secret is missing.
-- Account deletion exists inside the app and is backed by an Edge Function.
-- Mobile `register` and `forgot-password` now use `public-auth`, which applies IP/email throttling and reset redirect sanitization before touching Supabase Auth.
-- iOS no longer renders a direct Premium purchase CTA for an Android-only billing path.
-- `eas.json` now includes `submit.production` for Android internal-track / draft handoff.
-- Release automation now tests billing readiness, auth helper validation, merge/cancel decision logic, account deletion client flow, CSV sanitization, and notification helper logic.
+**Impact:** An unauthenticated caller can trigger plan-tier synchronization for arbitrary `app_user_id` values, causing unauthorized profile state changes and untrusted RevenueCat lookups.
 
-## Verification Notes
+**Code references**
 
-- `npm run verify:release` passes in the current repo state.
-- I could not query Supabase advisors from MCP during this review because the MCP transport reported `Auth required`, so advisor output was not available from this session.
+- [`/Users/jreynoso/I Got You iOS/supabase/functions/revenuecat-sync/index.ts:137`](/Users/jreynoso/I%20Got%20You%20iOS/supabase/functions/revenuecat-sync/index.ts#L137)
+- [`/Users/jreynoso/I Got You iOS/supabase/functions/revenuecat-sync/index.ts:146`](/Users/jreynoso/I%20Got%20You%20iOS/supabase/functions/revenuecat-sync/index.ts#L146)
+- [`/Users/jreynoso/I Got You iOS/supabase/functions/revenuecat-sync/index.ts:150`](/Users/jreynoso/I%20Got%20You%20iOS/supabase/functions/revenuecat-sync/index.ts#L150)
+- [`/Users/jreynoso/I Got You iOS/supabase/functions/revenuecat-sync/index.ts:161`](/Users/jreynoso/I%20Got%20You%20iOS/supabase/functions/revenuecat-sync/index.ts#L161)
+
+**Why it matters**
+
+The function intentionally supports two modes:
+
+- authenticated client calls using a Supabase bearer token
+- RevenueCat webhook calls using a shared secret token
+
+The problem is that the webhook branch only enforces auth **if** `REVENUECAT_WEBHOOK_AUTH_TOKEN` is present. If that secret is missing, requests without a bearer token fall into the webhook path and can submit any `app_user_id`, after which the function writes `plan_tier` back to `profiles`.
+
+That creates a configuration-sensitive fail-open path around a write-capable endpoint.
+
+**Recommended fix**
+
+- Fail closed: require `REVENUECAT_WEBHOOK_AUTH_TOKEN` for webhook mode.
+- If the token is missing, reject webhook-style requests with `503` or `401` instead of accepting them.
+- Consider separating webhook and client sync into different endpoints to reduce ambiguity.
+
+## Moderate Severity
+
+### SEC-2: Biometric gate can render protected screens before lock state resolves
+
+**Impact:** On app startup or route changes, protected content can appear before the biometric requirement is enforced, weakening local privacy controls.
+
+**Code references**
+
+- [`/Users/jreynoso/I Got You iOS/components/AppBiometricGate.tsx:35`](/Users/jreynoso/I%20Got%20You%20iOS/components/AppBiometricGate.tsx#L35)
+- [`/Users/jreynoso/I Got You iOS/components/AppBiometricGate.tsx:66`](/Users/jreynoso/I%20Got%20You%20iOS/components/AppBiometricGate.tsx#L66)
+- [`/Users/jreynoso/I Got You iOS/components/AppBiometricGate.tsx:69`](/Users/jreynoso/I%20Got%20You%20iOS/components/AppBiometricGate.tsx#L69)
+- [`/Users/jreynoso/I Got You iOS/components/AppBiometricGate.tsx:197`](/Users/jreynoso/I%20Got%20You%20iOS/components/AppBiometricGate.tsx#L197)
+- [`/Users/jreynoso/I Got You iOS/services/appLock.ts:7`](/Users/jreynoso/I%20Got%20You%20iOS/services/appLock.ts#L7)
+
+**Why it matters**
+
+`AppBiometricGate` initializes with:
+
+- `loading = false`
+- `requiresUnlock = false`
+
+and returns `null` whenever both remain false. The lock state is then resolved asynchronously from cached storage and from user preferences. During that gap, the app can render normally before the overlay appears.
+
+The cached flag is also stored in `AsyncStorage`, which is convenience storage rather than security-oriented storage. Even if the remote preference later corrects the value, the initial decision path is still fail-open.
+
+**Recommended fix**
+
+- Default the gate to blocking for authenticated users until lock state is resolved.
+- Treat unresolved state as locked, not unlocked.
+- Store the cached biometric-enabled flag in `SecureStore` instead of `AsyncStorage`, or stop trusting cached state for access-control decisions.
+
+## Low Severity / Hardening
+
+### SEC-3: Shared function CORS policy is fully wildcarded
+
+**Code references**
+
+- [`/Users/jreynoso/I Got You iOS/supabase/functions/_shared/cors.ts:1`](/Users/jreynoso/I%20Got%20You%20iOS/supabase/functions/_shared/cors.ts#L1)
+
+**Notes**
+
+This is not an immediate exploit by itself because the protected functions still validate bearer tokens server-side. Still, `Access-Control-Allow-Origin: *` is broader than necessary for sensitive account/admin functions and increases exposure if a token is obtained elsewhere.
+
+**Recommended fix**
+
+- Split public CORS from authenticated/admin CORS.
+- Restrict authenticated/admin functions to the known web origins actually used by the product.
+
+## What Checked Clean
+
+- `npm audit --omit=dev` returned zero known production dependency vulnerabilities.
+- `.env` is ignored by git and not tracked.
+- Frontend Supabase initialization rejects non-publishable keys in [`/Users/jreynoso/I Got You iOS/services/supabase.ts:16`](/Users/jreynoso/I%20Got%20You%20iOS/services/supabase.ts#L16).
+- Public auth and public contact endpoints implement origin checks and rate limiting.
+
+## Recommended Release Decision
+
+Do not treat the app as "fully hardened" until SEC-1 and SEC-2 are fixed. If you are comfortable with a managed risk release, SEC-1 is the first item to fix before production, and SEC-2 should follow immediately after.

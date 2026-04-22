@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text, View, Screen, Card } from '@/components/Themed';
 import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
-import { ArrowUpRight, ArrowDownLeft, ArrowRight, Plus, Send, Wallet, Box, Bell, Clock3, AlertTriangle, CheckCircle2, UserPlus, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ArrowUpRight, ArrowDownLeft, ArrowRight, Plus, Send, Wallet, Box, Bell, Clock3, AlertTriangle, UserPlus, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -23,7 +23,7 @@ type LoanRecord = {
   due_date: string | null;
   item_name: string | null;
   currency: string | null;
-  contacts?: { name?: string | null } | null;
+  contacts?: { name?: string | null; target_user_id?: string | null; link_status?: string | null } | null;
   remaining_amount?: number;
   last_activity_at?: string;
   last_payment_at?: string | null;
@@ -54,11 +54,14 @@ export default function DashboardScreen() {
   const [recentLoans, setRecentLoans] = useState<LoanRecord[]>([]);
   const [dueItems, setDueItems] = useState<LoanRecord[]>([]);
   const [requestCount, setRequestCount] = useState(0);
-  const [recordCount, setRecordCount] = useState(0);
   const [expandedRecentRecordId, setExpandedRecentRecordId] = useState<string | null>(null);
   const [recentSectionExpanded, setRecentSectionExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fetchInFlightRef = useRef(false);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const comingUpSectionYRef = useRef(0);
+  const recentSectionYRef = useRef(0);
+  const dueItemYRefs = useRef<Record<string, number>>({});
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -181,7 +184,7 @@ export default function DashboardScreen() {
             supabase.from('profiles').select('full_name, friend_code').eq('id', user.id).maybeSingle(),
             supabase
               .from('loans')
-              .select('id, amount, type, status, category, created_at, due_date, item_name, currency, contacts(name)')
+              .select('id, amount, type, status, category, created_at, due_date, item_name, currency, contacts(id, name, target_user_id, link_status)')
               .eq('user_id', user.id)
               .is('deleted_at', null)
               .order('created_at', { ascending: false }),
@@ -324,7 +327,6 @@ export default function DashboardScreen() {
       const borrowed = moneyLoans
         .filter((loan) => loan.type === 'borrowed')
         .reduce((acc, loan) => acc + Number(loan.remaining_amount || 0), 0);
-
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       const soon = new Date(now);
@@ -355,7 +357,6 @@ export default function DashboardScreen() {
           .sort((a, b) => getTimestamp(b.last_activity_at || b.created_at) - getTimestamp(a.last_activity_at || a.created_at))
           .slice(0, 8)
       );
-      setRecordCount(enrichedLoans.length);
       setRequestCount(requestsResult.count || 0);
     } catch (error: any) {
       console.error('dashboard load failed:', error?.message || error);
@@ -367,14 +368,37 @@ export default function DashboardScreen() {
     }
   };
 
-  const balance = summary.lent - summary.borrowed;
+  const balance = summary.borrowed - summary.lent;
   const hasOpenBalance = summary.lent + summary.borrowed > 0;
-  const balanceTone = getBalanceTone(summary.lent, summary.borrowed);
+  const balanceTone = getBalanceTone(summary.borrowed, summary.lent);
   const balanceDirection = !hasOpenBalance ? 'neutral' : balance > 0 ? 'positive' : 'negative';
+
+  const scrollToSection = React.useCallback((y: number) => {
+    scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+  }, []);
+
+  const handleInsightPress = React.useCallback((section: 'overdue' | 'dueSoon' | 'recent') => {
+    if (section === 'recent') {
+      setRecentSectionExpanded(true);
+      requestAnimationFrame(() => {
+        scrollToSection(recentSectionYRef.current);
+      });
+      return;
+    }
+
+    const targetItem = dueItems.find((item) => getDueStatus(item.due_date) === section);
+    if (targetItem?.id && Number.isFinite(dueItemYRefs.current[targetItem.id])) {
+      scrollToSection(dueItemYRefs.current[targetItem.id]);
+      return;
+    }
+
+    scrollToSection(comingUpSectionYRef.current);
+  }, [dueItems, scrollToSection]);
 
   return (
     <Screen style={styles.container} safeAreaEdges={['left', 'right', 'bottom']}>
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPadding }]}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
@@ -445,18 +469,18 @@ export default function DashboardScreen() {
                   ]}
                 >
                   {balanceDirection === 'positive'
-                    ? 'You lent more'
+                    ? 'You borrowed more'
                     : balanceDirection === 'negative'
-                      ? 'You borrowed more'
+                      ? 'You lent more'
                       : 'No open balance'}
                 </Text>
               </RNView>
             </RNView>
             <Text style={styles.balanceHint}>
               {balanceDirection === 'positive'
-                ? 'Right now, friends owe you more than you owe them.'
+                ? 'Right now, you owe more than friends owe you.'
                 : balanceDirection === 'negative'
-                  ? 'Right now, you owe more than friends owe you.'
+                  ? 'Right now, friends owe you more than you owe them.'
                   : "Right now, you're all settled up."}
             </Text>
 
@@ -506,13 +530,13 @@ export default function DashboardScreen() {
               </RNView>
               <RNView style={styles.distributionLegend}>
                 <RNView style={styles.legendItem}>
-                  <RNView style={[styles.legendDot, { backgroundColor: hasOpenBalance ? '#10B981' : '#94A3B8' }]} />
+                  <RNView style={[styles.legendDot, { backgroundColor: hasOpenBalance ? '#EF4444' : '#94A3B8' }]} />
                   <Text style={styles.legendText}>
                     {hasOpenBalance ? `${getCollectShare(summary.lent, summary.borrowed)}% owed to you` : '$0 owed to you'}
                   </Text>
                 </RNView>
                 <RNView style={styles.legendItem}>
-                  <RNView style={[styles.legendDot, { backgroundColor: hasOpenBalance ? '#EF4444' : '#94A3B8' }]} />
+                  <RNView style={[styles.legendDot, { backgroundColor: hasOpenBalance ? '#10B981' : '#94A3B8' }]} />
                   <Text style={styles.legendText}>
                     {hasOpenBalance ? `${100 - getCollectShare(summary.lent, summary.borrowed)}% you owe` : '$0 you owe'}
                   </Text>
@@ -522,36 +546,49 @@ export default function DashboardScreen() {
           </LinearGradient>
         </Card>
 
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          onLayout={(event) => {
+            comingUpSectionYRef.current = event.nativeEvent.layout.y;
+          }}
+        >
           <View style={[styles.sectionHeader, compactDashboardLayout && styles.sectionHeaderStacked]}>
             <Text style={styles.sectionTitle}>Coming up</Text>
-            <TouchableOpacity onPress={() => router.push('/requests')}>
-              <Text style={styles.sectionLink}>Confirmations</Text>
-            </TouchableOpacity>
           </View>
 
           <RNView style={styles.insightRow}>
-            <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
-              <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
-                <AlertTriangle size={18} color="#F59E0B" />
-              </RNView>
-              <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{summary.overdue}</Text>
-              <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Needs attention</Text>
-            </Card>
-            <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
-              <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
-                <Clock3 size={18} color="#3B82F6" />
-              </RNView>
-              <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{summary.dueSoon}</Text>
-              <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Next 7 days</Text>
-            </Card>
-            <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
-              <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                <CheckCircle2 size={18} color="#10B981" />
-              </RNView>
-              <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{recordCount}</Text>
-              <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Shared records</Text>
-            </Card>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={summary.overdue > 0 ? 0.85 : 1}
+              disabled={summary.overdue === 0}
+              onPress={() => handleInsightPress('overdue')}
+            >
+              <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
+                <RNView style={styles.insightTopRow}>
+                  <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+                    <AlertTriangle size={18} color="#F59E0B" />
+                  </RNView>
+                  <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{summary.overdue}</Text>
+                </RNView>
+                <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Needs attention</Text>
+              </Card>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={summary.dueSoon > 0 ? 0.85 : 1}
+              disabled={summary.dueSoon === 0}
+              onPress={() => handleInsightPress('dueSoon')}
+            >
+              <Card style={[styles.insightCard, compactDashboardLayout && styles.insightCardCompact]}>
+                <RNView style={styles.insightTopRow}>
+                  <RNView style={[styles.insightIcon, compactDashboardLayout && styles.insightIconCompact, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+                    <Clock3 size={18} color="#3B82F6" />
+                  </RNView>
+                  <Text style={[styles.insightValue, compactDashboardLayout && styles.insightValueCompact]}>{summary.dueSoon}</Text>
+                </RNView>
+                <Text style={[styles.insightLabel, compactDashboardLayout && styles.insightLabelCompact]}>Next 7 days</Text>
+              </Card>
+            </TouchableOpacity>
           </RNView>
 
           {dueItems.length === 0 ? (
@@ -564,14 +601,21 @@ export default function DashboardScreen() {
             </Card>
           ) : (
             dueItems.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.listItemWrapper} onPress={() => router.push(`/loan/${item.id}`)}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.listItemWrapper}
+                onLayout={(event) => {
+                  dueItemYRefs.current[item.id] = comingUpSectionYRef.current + event.nativeEvent.layout.y;
+                }}
+                onPress={() => router.push(`/loan/${item.id}`)}
+              >
                 <Card style={styles.listCard}>
                   <RNView style={styles.listLeft}>
                     <RNView style={[styles.iconBox, { backgroundColor: item.category === 'item' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(148, 163, 184, 0.08)' }]}>
                       {item.category === 'item' ? (
                         <Box size={20} color="#6366F1" />
                       ) : (
-                        <Wallet size={20} color={item.type === 'lent' ? '#10B981' : '#EF4444'} />
+                        <Wallet size={20} color={item.type === 'lent' ? '#EF4444' : '#10B981'} />
                       )}
                     </RNView>
                     <View style={styles.listInfo}>
@@ -581,7 +625,7 @@ export default function DashboardScreen() {
                     </View>
                   </RNView>
                   <RNView style={styles.listRight}>
-                    <Text style={[styles.amountText, { color: item.type === 'lent' ? '#10B981' : '#EF4444' }]}>{getRecordValue(item)}</Text>
+                    <Text style={[styles.amountText, { color: item.type === 'lent' ? '#EF4444' : '#10B981' }]}>{getRecordValue(item)}</Text>
                   </RNView>
                 </Card>
               </TouchableOpacity>
@@ -589,7 +633,12 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          onLayout={(event) => {
+            recentSectionYRef.current = event.nativeEvent.layout.y;
+          }}
+        >
           <View style={[styles.sectionHeader, compactDashboardLayout && styles.sectionHeaderStacked]}>
             <Text style={styles.sectionTitle}>Recent records</Text>
             <TouchableOpacity
@@ -636,7 +685,7 @@ export default function DashboardScreen() {
                       {item.category === 'item' ? (
                         <Box size={20} color="#6366F1" />
                       ) : (
-                        <Wallet size={20} color={item.type === 'lent' ? '#10B981' : '#EF4444'} />
+                        <Wallet size={20} color={item.type === 'lent' ? '#EF4444' : '#10B981'} />
                       )}
                     </RNView>
                     <View style={styles.listInfo}>
@@ -646,7 +695,14 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                   <RNView style={[styles.recentRecordHeaderRight, compactDashboardLayout && styles.recentRecordHeaderRightStacked]}>
                     <RNView style={[styles.listRight, compactDashboardLayout && styles.listRightStacked]}>
-                      <Text style={[styles.amountText, { color: item.category === 'money' ? (item.type === 'lent' ? '#10B981' : '#EF4444') : '#6366F1' }]}>{getRecentRecordValue(item)}</Text>
+                      <Text
+                        style={[styles.amountText, { color: item.category === 'money' ? (item.type === 'lent' ? '#EF4444' : '#10B981') : '#6366F1' }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
+                      >
+                        {getRecentRecordValue(item)}
+                      </Text>
                       <Text style={styles.statusBadge}>{item.status}</Text>
                     </RNView>
                     <TouchableOpacity
@@ -798,6 +854,21 @@ function getDueDescriptor(dueDate: string | null) {
   return `${Math.abs(diffDays)} days overdue`;
 }
 
+function getDueStatus(dueDate: string | null) {
+  if (!dueDate) return 'dueSoon';
+  const due = new Date(`${dueDate}T12:00:00`);
+  if (Number.isNaN(due.getTime())) return 'dueSoon';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const soon = new Date(today);
+  soon.setDate(today.getDate() + 7);
+
+  if (due.getTime() < today.getTime()) return 'overdue';
+  if (due.getTime() <= soon.getTime()) return 'dueSoon';
+  return 'dueSoon';
+}
+
 function formatActivityDate(value?: string | null) {
   if (!value) return '';
   const date = new Date(value);
@@ -822,9 +893,7 @@ function getRecordDescriptor(item: LoanRecord) {
   }
 
   if (item.category === 'item') {
-    return item.type === 'lent'
-      ? `Needs to return ${item.item_name || 'item'}`
-      : `You need to return ${item.item_name || 'item'}`;
+    return 'Item';
   }
 
   return item.type === 'lent' ? 'Money you should collect' : 'Money you should pay back';
@@ -832,12 +901,12 @@ function getRecordDescriptor(item: LoanRecord) {
 
 function getRecordValue(item: LoanRecord) {
   if (item.category === 'item') {
-    return 'ITEM';
+    return item.item_name || 'Item';
   }
 
   const symbol = getCurrencySymbol(item.currency || 'USD');
   const amount = Math.round(Number(item.remaining_amount || item.amount || 0)).toLocaleString();
-  return `${item.type === 'lent' ? '+' : '-'}${symbol}${amount}`;
+  return `${item.type === 'lent' ? '-' : '+'}${symbol}${amount}`;
 }
 
 function getRecentRecordValue(item: LoanRecord) {
@@ -849,7 +918,7 @@ function getRecentRecordValue(item: LoanRecord) {
   ) {
     const symbol = getCurrencySymbol(item.currency || 'USD');
     const amount = Math.round(Number(item.last_payment_amount || 0)).toLocaleString();
-    return `${item.type === 'lent' ? '+' : '-'}${symbol}${amount}`;
+    return `${item.type === 'lent' ? '-' : '+'}${symbol}${amount}`;
   }
 
   return getRecordValue(item);
@@ -1135,10 +1204,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
   },
   distributionCollect: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#EF4444',
   },
   distributionPay: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#10B981',
   },
   distributionLegend: {
     flexDirection: 'row',
@@ -1243,33 +1312,38 @@ const styles = StyleSheet.create({
   insightCardCompact: {
     padding: 12,
   },
+  insightTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: 'transparent',
+  },
   insightIcon: {
     width: 34,
     height: 34,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
   },
   insightIconCompact: {
     width: 30,
     height: 30,
     borderRadius: 10,
-    marginBottom: 10,
   },
   insightValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: '#0F172A',
   },
   insightValueCompact: {
-    fontSize: 20,
+    fontSize: 18,
   },
   insightLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#64748B',
-    marginTop: 4,
+    marginTop: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     lineHeight: 14,
@@ -1337,6 +1411,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'transparent',
+    minWidth: 0,
   },
   recentRecordHeaderStacked: {
     alignItems: 'stretch',
@@ -1347,6 +1422,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
     marginLeft: 12,
+    minWidth: 0,
+    flexShrink: 1,
   },
   recentRecordHeaderRightStacked: {
     width: '100%',
@@ -1358,6 +1435,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     backgroundColor: 'transparent',
+    minWidth: 0,
   },
   listLeftStacked: {
     width: '100%',
@@ -1374,6 +1452,7 @@ const styles = StyleSheet.create({
   listInfo: {
     flex: 1,
     backgroundColor: 'transparent',
+    minWidth: 0,
   },
   listName: {
     fontSize: 16,
@@ -1400,6 +1479,8 @@ const styles = StyleSheet.create({
   listRight: {
     alignItems: 'flex-end',
     backgroundColor: 'transparent',
+    minWidth: 0,
+    flexShrink: 1,
   },
   listRightStacked: {
     alignItems: 'flex-start',
@@ -1407,6 +1488,8 @@ const styles = StyleSheet.create({
   amountText: {
     fontSize: 16,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   statusBadge: {
     fontSize: 11,

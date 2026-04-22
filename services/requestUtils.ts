@@ -51,7 +51,8 @@ export function getMergeChoiceOptions(request: any) {
 function formatSignedMetric(value: number, positiveLabel: string, negativeLabel: string) {
   if (!Number.isFinite(value) || value === 0) return 'Balanced';
   const direction = value > 0 ? positiveLabel : negativeLabel;
-  return `${Math.abs(value).toLocaleString()} ${direction}`;
+  const sign = value > 0 ? '-' : '+';
+  return `${sign}${Math.abs(value).toLocaleString()} ${direction}`;
 }
 
 export function formatMergeChoiceSummary(summary: any) {
