@@ -53,7 +53,7 @@ export default function LandingPage() {
             title: 'Add friends',
             subtitle: 'Link accounts so both people see the shared history.',
             accent: '#6366F1',
-            lines: ['Search by friend code', 'Invite by email or text', 'Connected contact card'],
+            lines: ['Search by friend code', 'Invite by email first', 'Connected contact card'],
         },
         {
             title: 'Create a record',

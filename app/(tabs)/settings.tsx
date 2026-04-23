@@ -18,7 +18,7 @@ import { useAppTheme } from '@/hooks/useAppTheme';
 const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
 
 export default function SettingsScreen() {
-    const { user, role, planTier, initialized, setSession, setUser, setRole, setPlanTier } = useAuthStore();
+    const { user, role, planTier, trialStartedAt, initialized, setSession, setUser, setRole, setPlanTier, setTrialStartedAt } = useAuthStore();
     const { t } = useI18n();
     const { theme, colorScheme } = useAppTheme();
     const router = useRouter();
@@ -107,6 +107,7 @@ export default function SettingsScreen() {
             setUser(null);
             setRole(null);
             setPlanTier('free');
+            setTrialStartedAt(null);
             navigateToLanding();
         } catch (error: any) {
             try {
@@ -115,6 +116,7 @@ export default function SettingsScreen() {
                 setUser(null);
                 setRole(null);
                 setPlanTier('free');
+                setTrialStartedAt(null);
                 navigateToLanding();
             } catch {
                 Alert.alert(t('Error'), error?.message || t('Could not sign out right now.'));
@@ -125,7 +127,7 @@ export default function SettingsScreen() {
     };
 
     const handleExport = async () => {
-        if (!hasPremiumAccess(planTier, { trialStartedAt: user?.created_at })) {
+        if (!hasPremiumAccess(planTier, { trialStartedAt })) {
             Alert.alert(t('Membership required'), t('CSV export is available during the 21-day free trial or with Premium.'));
             return;
         }
@@ -145,9 +147,9 @@ export default function SettingsScreen() {
         }
     };
 
-    const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
+    const membershipStatus = getMembershipStatus(planTier, { trialStartedAt });
     const hasPaidOrTrialAccess = membershipStatus !== 'free';
-    const localizedPlanLabel = t(getPlanLabel(planTier, { trialStartedAt: user?.created_at }));
+    const localizedPlanLabel = t(getPlanLabel(planTier, { trialStartedAt }));
 
     const menuItems = [
         {
@@ -156,7 +158,7 @@ export default function SettingsScreen() {
             sub: t(membershipStatus === 'premium' ? 'Annual membership active' : membershipStatus === 'trial' ? '21-day free trial active' : 'Your 21-day free trial has ended'),
             onPress: () => router.push('/subscription' as any),
         },
-        { icon: User, label: t('Profile'), sub: t('Photo, name, phone, invite code'), onPress: () => router.push('/profile') },
+        { icon: User, label: t('Profile'), sub: t('Photo, name, phone, referral status'), onPress: () => router.push('/profile') },
         { icon: SlidersHorizontal, label: t('Preferences'), sub: t('Appearance, language, currency'), onPress: () => router.push('/preferences') },
         { icon: Bell, label: t('Notifications'), sub: t(prefs.push_enabled ? 'Enabled' : 'Disabled'), onPress: () => router.push('/notifications') },
         { icon: Shield, label: t('Security'), sub: t(prefs.biometric_enabled ? 'Biometric On' : 'Biometric Off'), onPress: () => router.push('/security') },

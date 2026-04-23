@@ -8,6 +8,7 @@ interface AuthState {
     user: User | null;
     role: string | null;
     planTier: PlanTier;
+    trialStartedAt: string | null;
     language: AppLanguage;
     initialized: boolean;
     referralReward: {
@@ -20,6 +21,7 @@ interface AuthState {
     setUser: (user: User | null) => void;
     setRole: (role: string | null) => void;
     setPlanTier: (planTier: PlanTier) => void;
+    setTrialStartedAt: (trialStartedAt: string | null) => void;
     setLanguage: (language: AppLanguage) => void;
     setInitialized: (initialized: boolean) => void;
     showReferralReward: (reward: {
@@ -36,6 +38,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     role: null,
     planTier: 'free',
+    trialStartedAt: null,
     language: getDeviceLanguage(),
     initialized: false,
     referralReward: null,
@@ -43,6 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     setUser: (user) => set({ user }),
     setRole: (role) => set({ role }),
     setPlanTier: (planTier) => set({ planTier }),
+    setTrialStartedAt: (trialStartedAt) => set({ trialStartedAt }),
     setLanguage: (language) => set({ language }),
     setInitialized: (initialized) => set({ initialized }),
     showReferralReward: (reward) => set({ referralReward: reward }),

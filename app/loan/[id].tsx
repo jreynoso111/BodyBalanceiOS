@@ -23,7 +23,7 @@ export default function LoanDetailScreen() {
     const loanId = Array.isArray(id) ? id[0] : id;
     const router = useRouter();
     const navigation = useNavigation();
-    const { user, planTier } = useAuthStore();
+    const { user, planTier, trialStartedAt } = useAuthStore();
     const { t } = useI18n();
     const [loan, setLoan] = useState<any>(null);
     const [payments, setPayments] = useState<any[]>([]);
@@ -623,7 +623,7 @@ export default function LoanDetailScreen() {
     };
 
     const handleSharePdf = async () => {
-        if (!hasPremiumAccess(planTier, { trialStartedAt: user?.created_at })) {
+        if (!hasPremiumAccess(planTier, { trialStartedAt })) {
             Alert.alert(t('Membership required'), t('PDF sharing is available during the 21-day free trial or with Premium.'));
             return;
         }
@@ -773,7 +773,7 @@ export default function LoanDetailScreen() {
                     ),
                     headerRight: () => (
                         <RNView style={styles.headerActions}>
-                            {hasPremiumAccess(planTier, { trialStartedAt: user?.created_at }) ? (
+                            {hasPremiumAccess(planTier, { trialStartedAt }) ? (
                                 <TouchableOpacity onPress={() => void handleSharePdf()} style={styles.shareHeader} disabled={sharingPdf}>
                                     {sharingPdf ? <ActivityIndicator size="small" color="#4F46E5" /> : <Share2 size={20} color="#4F46E5" />}
                                 </TouchableOpacity>

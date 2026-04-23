@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View as RNView } from 'react-native';
-import { Redirect, Stack, useRouter } from 'expo-router';
+import { Redirect, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Lock, Mail, User } from 'lucide-react-native';
 
 import { Card, Screen, Text } from '@/components/Themed';
@@ -14,6 +14,7 @@ import {
     validateVerificationCodeInput,
 } from '@/services/authFlowUtils';
 import { requestSignupCode } from '@/services/publicAuth';
+import { applyInvitationCode } from '@/services/referrals';
 import { supabase } from '@/services/supabase';
 import { getGoogleOAuthUnavailableReason, isGoogleOAuthEnabledForBuild, signInWithGoogle } from '@/services/oauth';
 import { useAuthStore } from '@/store/authStore';
@@ -26,18 +27,30 @@ type RegisterStep = 'details' | 'verify';
 
 export default function RegisterScreen() {
     const router = useRouter();
+    const params = useLocalSearchParams<{
+        inviteCode?: string | string[];
+        invite_code?: string | string[];
+        code?: string | string[];
+    }>();
     const { theme } = useAppTheme();
     const { t } = useI18n();
     const { initialized, user } = useAuthStore();
+    const inviteCodeParam =
+        (Array.isArray(params.inviteCode) ? params.inviteCode[0] : params.inviteCode) ||
+        (Array.isArray(params.invite_code) ? params.invite_code[0] : params.invite_code) ||
+        (Array.isArray(params.code) ? params.code[0] : params.code) ||
+        '';
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [inviteCode, setInviteCode] = useState(String(inviteCodeParam || '').trim().toUpperCase());
     const [verificationCode, setVerificationCode] = useState('');
     const [step, setStep] = useState<RegisterStep>('details');
     const [loading, setLoading] = useState(false);
     const [verifyingCode, setVerifyingCode] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [accountVerified, setAccountVerified] = useState(false);
     const [feedback, setFeedback] = useState<{ tone: FeedbackTone; text: string } | null>(null);
     const googleEnabledForBuild = isGoogleOAuthEnabledForBuild();
     const googleUnavailableReason = getGoogleOAuthUnavailableReason();
@@ -67,7 +80,32 @@ export default function RegisterScreen() {
     };
 
     const normalizedEmail = normalizeAuthEmail(email);
+    const normalizedInviteCode = inviteCode.trim().toUpperCase();
     const busy = loading || verifyingCode || googleLoading;
+
+    const completeAccountSetup = async () => {
+        if (normalizedInviteCode) {
+            const { error } = await withTimeout(applyInvitationCode(normalizedInviteCode));
+            if (error) {
+                showMessage(
+                    'Invite code could not be applied',
+                    error.message || 'Your account was created, but the invite code could not be completed.',
+                    'error'
+                );
+                return false;
+            }
+        }
+
+        showMessage(
+            'Account created',
+            normalizedInviteCode
+                ? 'Email verified and invite code applied. Your account is ready.'
+                : 'Email verified. Your account is ready.',
+            'success'
+        );
+        router.replace(nextRoute as never);
+        return true;
+    };
 
     const validateAccountFields = () => {
         const validationError = validateRegistrationFields({
@@ -122,6 +160,19 @@ export default function RegisterScreen() {
 
     const verifyEmailCode = async () => {
         if (busy) return;
+
+        if (accountVerified) {
+            try {
+                setFeedback(null);
+                setVerifyingCode(true);
+                await completeAccountSetup();
+            } catch (error: any) {
+                showMessage('Account setup failed', error?.message || 'Could not finish account setup right now.', 'error');
+            } finally {
+                setVerifyingCode(false);
+            }
+            return;
+        }
 
         const token = verificationCode.trim().replace(/\s+/g, '');
         const verificationErrorMessage = validateVerificationCodeInput(token);
@@ -200,8 +251,8 @@ export default function RegisterScreen() {
                 return;
             }
 
-            showMessage('Account created', 'Email verified. Your account is ready.', 'success');
-            router.replace(nextRoute as never);
+            setAccountVerified(true);
+            await completeAccountSetup();
         } catch (error: any) {
             showMessage('Verification failed', error?.message || 'Could not verify the code right now.', 'error');
         } finally {
@@ -222,6 +273,21 @@ export default function RegisterScreen() {
 
             const result = await withTimeout(signInWithGoogle(), 30000);
             if (result.status === 'success') {
+                const session = await waitForAuthSession();
+                if (!session) {
+                    showMessage('Google sign in failed', 'Your session did not finish loading. Please try again.', 'error');
+                    return;
+                }
+
+                if (normalizedInviteCode) {
+                    const completed = await completeAccountSetup();
+                    if (!completed) {
+                        setStep('verify');
+                        setAccountVerified(true);
+                    }
+                    return;
+                }
+
                 showMessage('Success', 'Signed in with Google.', 'success');
                 router.replace(nextRoute as never);
                 return;
@@ -245,7 +311,7 @@ export default function RegisterScreen() {
         }
     };
 
-    if (Platform.OS === 'web' && initialized && user) {
+    if (Platform.OS === 'web' && initialized && user && step === 'details' && !accountVerified) {
         return <Redirect href="/settings" />;
     }
 
@@ -314,6 +380,21 @@ export default function RegisterScreen() {
                         </RNView>
                     </RNView>
 
+                    <RNView style={styles.inputGroup}>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Invite Code (Optional)')}</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
+                            <TextInput
+                                placeholder={t('Only if a friend invited your email')}
+                                placeholderTextColor={theme.tertiaryText}
+                                value={inviteCode}
+                                onChangeText={(value) => setInviteCode(value.toUpperCase())}
+                                autoCapitalize="characters"
+                                style={[styles.input, { color: theme.inputText }]}
+                            />
+                        </RNView>
+                    </RNView>
+
                     <TouchableOpacity
                         onPress={sendVerificationCode}
                         disabled={busy}
@@ -347,13 +428,38 @@ export default function RegisterScreen() {
                         </RNView>
                     </RNView>
 
+                    <RNView style={styles.inputGroup}>
+                        <Text style={[styles.label, { color: theme.secondaryText }]}>{t('Invite Code (Optional)')}</Text>
+                        <RNView style={[styles.inputWrapper, { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder }]}>
+                            <Mail size={18} color={theme.tertiaryText} style={styles.inputIcon} />
+                            <TextInput
+                                placeholder={t('Required if this email was invited')}
+                                placeholderTextColor={theme.tertiaryText}
+                                value={inviteCode}
+                                onChangeText={(value) => setInviteCode(value.toUpperCase())}
+                                autoCapitalize="characters"
+                                style={[styles.input, { color: theme.inputText }]}
+                            />
+                        </RNView>
+                    </RNView>
+
+                    {normalizedInviteCode ? (
+                        <Text style={[styles.verifyHint, { color: theme.secondaryText }]}>
+                            {t('If a friend reserved this email for a referral, the invite code will be applied after your account is verified.')}
+                        </Text>
+                    ) : null}
+
                     <TouchableOpacity
                         onPress={verifyEmailCode}
                         disabled={busy}
                         style={[styles.primaryButton, { backgroundColor: theme.primaryButton }, busy && { opacity: 0.75 }]}
                     >
                         <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-                            {verifyingCode ? t('VERIFYING...') : t('Verify Code & Create Account')}
+                            {verifyingCode
+                                ? t('VERIFYING...')
+                                : accountVerified
+                                    ? t('Finish Account Setup')
+                                    : t('Verify Code & Create Account')}
                         </Text>
                     </TouchableOpacity>
 

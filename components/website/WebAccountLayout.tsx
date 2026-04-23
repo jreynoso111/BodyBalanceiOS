@@ -45,7 +45,7 @@ export function WebAccountLayout({
   const pathname = usePathname() || '/settings';
   const router = useRouter();
   const { theme, colorScheme } = useAppTheme();
-  const { user, role, planTier, setSession, setUser, setRole, setPlanTier, setLanguage } = useAuthStore();
+  const { user, role, planTier, trialStartedAt, setSession, setUser, setRole, setPlanTier, setTrialStartedAt, setLanguage } = useAuthStore();
   const isDark = colorScheme === 'dark';
   const displayName =
     String(user?.user_metadata?.full_name || '').trim() ||
@@ -68,6 +68,7 @@ export function WebAccountLayout({
     setUser(null);
     setRole(null);
     setPlanTier('free');
+    setTrialStartedAt(null);
     setLanguage(getDeviceLanguage());
     navigateToLanding();
   };
@@ -101,7 +102,7 @@ export function WebAccountLayout({
               <Text style={[styles.profileName, { color: theme.title }]}>{displayName}</Text>
               <Text style={[styles.profileEmail, { color: theme.secondaryText }]}>{user?.email}</Text>
               <Text style={[styles.profileMeta, { color: theme.tint }]}>
-                {getPlanLabel(planTier)} plan{hasAdminAccess ? ' • Admin' : ''}
+                {getPlanLabel(planTier, { trialStartedAt })} plan{hasAdminAccess ? ' • Admin' : ''}
               </Text>
             </View>
 

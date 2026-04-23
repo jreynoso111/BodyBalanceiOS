@@ -95,13 +95,13 @@ export default function DashboardScreen() {
 
   const handleInviteToApp = async () => {
     if (!friendCodeReady || !friendCode) {
-      Alert.alert('Friend code unavailable', 'Your friend code is still being generated. Try again in a moment.');
+      Alert.alert('Invite code unavailable', 'Your invite code is still being generated. Try again in a moment.');
       return;
     }
 
     try {
       await Share.share({
-        message: `Join me on Buddy Balance and register with my friend code ${friendCode}. The app helps us keep shared balances and records in one place.`,
+        message: `Join me on Buddy Balance. I need to send the invite to your email first, then you can finish signup with my invite code ${friendCode}. The app helps us keep shared balances and records in one place.`,
       });
     } catch (error: any) {
       Alert.alert('Could not open invite', error?.message || 'The share sheet could not be opened right now.');
@@ -740,7 +740,7 @@ export default function DashboardScreen() {
         <Card style={styles.inviteCard}>
           <Text style={styles.inviteCardTitle}>Invite someone to Buddy Balance</Text>
           <Text style={styles.inviteCardText}>
-            Share your friend code and invite someone to register in the app.
+            Share your invite code, then send the actual invite from Membership to their email before they sign up.
           </Text>
           <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary]} onPress={() => void handleInviteToApp()}>
             <Send size={18} color="#FFFFFF" />

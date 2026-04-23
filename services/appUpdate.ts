@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import { Linking, Platform } from 'react-native';
 
 import { supabase } from '@/services/supabase';
@@ -8,7 +9,11 @@ const GOOGLE_PLAY_PACKAGE_NAME = 'com.jreynoso.buddybalance';
 const GOOGLE_PLAY_URL = `https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE_NAME}`;
 const GOOGLE_PLAY_MARKET_URL = `market://details?id=${GOOGLE_PLAY_PACKAGE_NAME}`;
 const LAST_DISMISSED_UPDATE_VERSION_KEY = 'last_dismissed_update_version_code';
-const ANDROID_UPDATE_TRACK = 'internal';
+
+function getAndroidUpdateTrack() {
+  const appEnv = String(Constants.expoConfig?.extra?.appEnv || '').trim().toLowerCase();
+  return appEnv === 'production' ? 'production' : 'internal';
+}
 
 export type AndroidUpdateInfo = {
   updateAvailable: boolean;
@@ -32,14 +37,16 @@ export async function getAndroidUpdateInfo(): Promise<AndroidUpdateInfo> {
       installedVersionCode,
       latestVersionCode: null,
       releaseStatus: null,
-      track: ANDROID_UPDATE_TRACK,
+      track: getAndroidUpdateTrack(),
     };
   }
+
+  const track = getAndroidUpdateTrack();
 
   const result = await supabase.functions.invoke('google-play-sync', {
     body: {
       mode: 'latest_release',
-      track: ANDROID_UPDATE_TRACK,
+      track,
       package_name: Application.applicationId || GOOGLE_PLAY_PACKAGE_NAME,
     },
   });
@@ -55,14 +62,14 @@ export async function getAndroidUpdateInfo(): Promise<AndroidUpdateInfo> {
 
   return {
     updateAvailable:
-      installedVersionCode != null &&
+    installedVersionCode != null &&
       normalizedLatestVersionCode != null &&
       normalizedLatestVersionCode > installedVersionCode &&
       String(releaseStatus || '').toLowerCase() !== 'draft',
     installedVersionCode,
     latestVersionCode: normalizedLatestVersionCode,
     releaseStatus,
-    track: ANDROID_UPDATE_TRACK,
+    track,
   };
 }
 

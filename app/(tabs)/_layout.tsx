@@ -13,8 +13,8 @@ export default function TabLayout() {
   const { t } = useI18n();
   const router = useRouter();
   const segments = useSegments();
-  const { user, initialized, planTier } = useAuthStore();
-  const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
+  const { user, initialized, planTier, trialStartedAt } = useAuthStore();
+  const membershipStatus = getMembershipStatus(planTier, { trialStartedAt });
 
   if (initialized && !user) {
     return <Redirect href="/" />;

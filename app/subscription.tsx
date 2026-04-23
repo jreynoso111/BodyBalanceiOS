@@ -18,6 +18,7 @@ import {
   getPremiumTrialEndsAt,
   PREMIUM_TRIAL_DAYS,
 } from '@/services/subscriptionPlan';
+import { getReferralPremiumDaysRemaining } from '@/services/subscriptionPlanUtils';
 import { createReferralEmailInvite, formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
 import { useAuthStore } from '@/store/authStore';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
@@ -25,11 +26,12 @@ import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 export default function SubscriptionScreen() {
   const playStoreLinkPlaceholder = 'https://play.google.com/store/apps/details?id=com.jreynoso.buddybalance';
   const planTier = useAuthStore((state) => state.planTier);
+  const trialStartedAt = useAuthStore((state) => state.trialStartedAt);
   const user = useAuthStore((state) => state.user);
   const initialized = useAuthStore((state) => state.initialized);
-  const membershipStatus = getMembershipStatus(planTier, { trialStartedAt: user?.created_at });
-  const trialDaysRemaining = getPremiumTrialDaysRemaining(user?.created_at);
-  const trialEndsAt = getPremiumTrialEndsAt(user?.created_at);
+  const membershipStatus = getMembershipStatus(planTier, { trialStartedAt });
+  const trialDaysRemaining = getPremiumTrialDaysRemaining(trialStartedAt);
+  const trialEndsAt = getPremiumTrialEndsAt(trialStartedAt);
   const planTitle =
     membershipStatus === 'premium'
       ? 'Premium active'
@@ -47,6 +49,7 @@ export default function SubscriptionScreen() {
   const [billingReady, setBillingReady] = React.useState(false);
   const [billingStatusLoading, setBillingStatusLoading] = React.useState(Platform.OS === 'android' && isBillingAvailable());
   const [billingStatusReason, setBillingStatusReason] = React.useState<string | null>(unavailableReason);
+  const referralDaysRemaining = getReferralPremiumDaysRemaining(referralSummary?.premiumReferralExpiresAt);
   const selectedPackageLabel =
     premiumPackageOptions.find((option) => option.id === selectedPackageId)?.label ||
     premiumPackageOptions[0]?.label ||
@@ -151,10 +154,10 @@ export default function SubscriptionScreen() {
       `${inviterLabel} invited you to join Buddy Balance.\n\n` +
       `Download the app from Google Play here:\n` +
       `${playStoreLinkPlaceholder}\n\n` +
-      `After you install it, create your account and enter this friend code:\n` +
+      `This invitation is reserved for ${normalizedEmail}. After you install the app, create your account with that same email and enter this invite code during signup:\n` +
       `${referralSummary.inviteCode}\n\n` +
       `Buddy Balance helps friends and family keep shared balances, payments, and records organized in one place.\n\n` +
-      `Once you are inside the app, add the code during signup so we can connect.\n\n` +
+      `The referral only counts if the same invited email finishes signup, uses this code on the new account, and stays active during the first week.\n\n` +
       `See you there.`;
     const mailtoUrl =
       `mailto:${encodeURIComponent(normalizedEmail)}` +
@@ -163,15 +166,15 @@ export default function SubscriptionScreen() {
 
     setSendingInvite(true);
     try {
-      const inviteReservation = await createReferralEmailInvite(normalizedEmail);
-      if (inviteReservation.error) {
-        Alert.alert('Invite unavailable', inviteReservation.error.message);
-        return;
-      }
-
       const supported = await Linking.canOpenURL(mailtoUrl);
       if (!supported) {
         Alert.alert('Email unavailable', 'This device cannot open the email composer right now.');
+        return;
+      }
+
+      const inviteReservation = await createReferralEmailInvite(normalizedEmail);
+      if (inviteReservation.error) {
+        Alert.alert('Invite unavailable', inviteReservation.error.message);
         return;
       }
 
@@ -208,7 +211,7 @@ export default function SubscriptionScreen() {
             <Text style={styles.webPlanValue}>{planTitle}</Text>
             <Text style={styles.webBody}>
               {membershipStatus === 'trial'
-                ? `Your account currently has full feature access through a ${PREMIUM_TRIAL_DAYS}-day free trial that started when you registered.`
+                ? `Your account currently has full feature access through a ${PREMIUM_TRIAL_DAYS}-day free trial that started when your trial was activated.`
                 : 'Premium subscriptions are handled in the Android app through Google Play.'}
             </Text>
             {membershipStatus === 'trial' && trialEndsAt ? (
@@ -224,7 +227,7 @@ export default function SubscriptionScreen() {
               'CSV exports and PDF sharing after the trial window',
               'Premium status shared across the app and web account center',
               'Google Play billing handled on Android',
-              ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
+              ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses, only when referral Premium is expired or within 5 days of ending']),
             ].map((benefit) => (
               <RNView key={benefit} style={styles.webBenefitRow}>
                 <Check size={15} color="#10B981" />
@@ -240,7 +243,7 @@ export default function SubscriptionScreen() {
               <Text style={styles.webPanelTitle}>Referral status</Text>
               <Text style={styles.webBody}>
                 {referralSummary.premiumReferralExpiresAt
-                  ? `Referral Premium active until ${formatReferralExpiry(referralSummary.premiumReferralExpiresAt)}.`
+                  ? `Referral Premium active until ${formatReferralExpiry(referralSummary.premiumReferralExpiresAt)}${referralDaysRemaining > 0 ? ` • ${referralDaysRemaining} day${referralDaysRemaining === 1 ? '' : 's'} left` : ''}.`
                   : `${referralSummary.referralCount}/3 invite code uses earned toward your next free Premium month.`}
               </Text>
               <Text style={styles.webReferralCode}>Your code: {referralSummary.inviteCode || 'Loading...'}</Text>
@@ -353,7 +356,7 @@ export default function SubscriptionScreen() {
             'CSV exports and PDF sharing after the trial window',
             'Premium status shared across the app and web account center',
             premiumPackageOptions.length > 1 ? 'Monthly or annual Google Play billing on Android' : 'Annual Google Play billing on Android',
-            ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses']),
+            ...(membershipStatus === 'premium' ? [] : ['1 free month of Premium every 3 successful invite code uses, only when referral Premium is expired or within 5 days of ending']),
           ].map((benefit) => (
             <RNView key={benefit} style={styles.benefitRow}>
               <RNView style={styles.benefitIcon}>
@@ -381,7 +384,7 @@ export default function SubscriptionScreen() {
           {referralSummary ? (
             <Text style={styles.androidHint}>
               {referralSummary.premiumReferralExpiresAt
-                ? `Referral Premium active until ${formatReferralExpiry(referralSummary.premiumReferralExpiresAt)}.`
+                ? `Referral Premium active until ${formatReferralExpiry(referralSummary.premiumReferralExpiresAt)}${referralDaysRemaining > 0 ? ` • ${referralDaysRemaining} day${referralDaysRemaining === 1 ? '' : 's'} left` : ''}.`
                 : `${referralSummary.referralCount}/3 invite code uses earned toward your next free Premium month.`}
             </Text>
           ) : null}
@@ -391,9 +394,9 @@ export default function SubscriptionScreen() {
           <Card style={styles.inviteCard}>
             <Text style={styles.sectionTitle}>Invite 3 people</Text>
             <Text style={styles.inviteText}>
-              Send a prewritten email that invites someone to register and includes your friend code automatically.
+              Send a prewritten email invite that reserves your code for one email address before that person signs up.
             </Text>
-            <Text style={styles.inviteCodeBadge}>Your friend code: {referralSummary.inviteCode || 'Loading...'}</Text>
+            <Text style={styles.inviteCodeBadge}>Your invite code: {referralSummary.inviteCode || 'Loading...'}</Text>
             <TextInput
               value={inviteEmail}
               onChangeText={setInviteEmail}
@@ -413,7 +416,7 @@ export default function SubscriptionScreen() {
               {sendingInvite ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Send invite</Text>}
             </TouchableOpacity>
             <Text style={styles.inviteHelper}>
-              This invite only counts if that same email creates a new account and redeems your friend code.
+              This invite only counts if that same email creates a new account, redeems your invite code during signup, and stays active during the first week. A new referral month only unlocks when your current referral Premium is expired or within 5 days of ending.
             </Text>
           </Card>
         ) : null}

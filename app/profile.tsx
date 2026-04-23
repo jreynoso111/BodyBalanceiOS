@@ -13,8 +13,9 @@ import {
   removeProfileAvatar,
   uploadProfileAvatar,
 } from '@/services/profileAvatar';
-import { applyInvitationCode, formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
+import { formatReferralExpiry, getMyInviteSummary, InviteSummary } from '@/services/referrals';
 import { getPlanLabel, normalizePlanTier } from '@/services/subscriptionPlan';
+import { getReferralPremiumDaysRemaining } from '@/services/subscriptionPlanUtils';
 import { WebAccountLayout } from '@/components/website/WebAccountLayout';
 import { useAppTheme } from '@/hooks/useAppTheme';
 
@@ -22,7 +23,7 @@ const isMissingFriendCodeColumn = (message?: string) =>
   String(message || '').toLowerCase().includes('friend_code');
 
 export default function ProfileScreen() {
-  const { user, planTier, initialized, setPlanTier } = useAuthStore();
+  const { user, planTier, trialStartedAt, initialized, setPlanTier } = useAuthStore();
   const { t } = useI18n();
   const { theme, colorScheme } = useAppTheme();
   const router = useRouter();
@@ -35,9 +36,7 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [friendCode, setFriendCode] = useState('');
-  const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [inviteSummary, setInviteSummary] = useState<InviteSummary | null>(null);
-  const [applyingInviteCode, setApplyingInviteCode] = useState(false);
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarMarkedForRemoval, setAvatarMarkedForRemoval] = useState(false);
@@ -141,7 +140,6 @@ export default function ProfileScreen() {
     const inviteSummaryResult = await getMyInviteSummary();
     if (inviteSummaryResult.data) {
       setInviteSummary(inviteSummaryResult.data);
-      setInviteCodeInput((current) => current || inviteSummaryResult.data?.referredByCode || '');
     }
 
     avatarBase64Ref.current = null;
@@ -297,49 +295,17 @@ export default function ProfileScreen() {
 
     try {
       await Share.share({
-        message: t('Join me on Buddy Balance and use my invite code {code}. Every 3 successful uses unlocks 1 month of Premium for me.', { code: friendCode }),
+        message: t('Join me on Buddy Balance. I need to send the invite to your email first, then you can use my invite code {code} during signup. Every 3 successful uses can unlock 1 month of Premium for me when my referral Premium is expired or within 5 days of ending, and your account needs to stay active in the first week.', { code: friendCode }),
       });
     } catch (error: any) {
       Alert.alert(t('Error'), error?.message || t('Could not open the share sheet.'));
     }
   };
 
-  const handleApplyInviteCode = async () => {
-    const normalizedCode = inviteCodeInput.trim().toUpperCase();
-    if (!normalizedCode) {
-      Alert.alert(t('Invite code needed'), t('Enter an invite code to redeem it.'));
-      return;
-    }
-
-    if (normalizedCode === friendCode.trim().toUpperCase()) {
-      Alert.alert(t('Invalid invite code'), t('You cannot use your own invite code.'));
-      return;
-    }
-
-    setApplyingInviteCode(true);
-    try {
-      const { data, error } = await applyInvitationCode(normalizedCode);
-      if (error) {
-        throw error;
-      }
-
-      await loadProfile();
-      Alert.alert(
-        t('Invite code applied'),
-        data?.rewardMonths
-          ? t('This redemption completed a reward cycle for your friend. Your account is now linked to their invite.')
-          : t('The invite code was saved successfully.')
-      );
-    } catch (error: any) {
-      Alert.alert(t('Could not apply invite code'), error?.message || t('Try again in a moment.'));
-    } finally {
-      setApplyingInviteCode(false);
-    }
-  };
-
   const profileInitial = (fullName || email || user?.email || '?').trim().charAt(0).toUpperCase();
   const rewardExpiryLabel = formatReferralExpiry(inviteSummary?.premiumReferralExpiresAt);
-  const localizedPlanLabel = t(getPlanLabel(planTier, { trialStartedAt: user?.created_at }));
+  const referralDaysRemaining = getReferralPremiumDaysRemaining(inviteSummary?.premiumReferralExpiresAt);
+  const localizedPlanLabel = t(getPlanLabel(planTier, { trialStartedAt }));
   const referralCount = inviteSummary?.referralCount || 0;
   const referralsUntilNextReward = inviteSummary?.referralsUntilNextReward || 3;
   const inviteProgressPercent = Math.min(((referralCount % 3) || 0) / 3 * 100, 100);
@@ -433,26 +399,16 @@ export default function ProfileScreen() {
               <Text style={[styles.webSecondaryButtonText, { color: theme.navigation.text }]}>{t('Share code')}</Text>
             </TouchableOpacity>
 
-            <TextInput
-              style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
-              placeholder={t('Enter an invite code to redeem it.')}
-              placeholderTextColor={theme.tertiaryText}
-              value={inviteCodeInput}
-              onChangeText={setInviteCodeInput}
-              autoCapitalize="characters"
-            />
-            <TouchableOpacity
-              style={[styles.webPrimaryButton, { backgroundColor: theme.primaryButton }]}
-              onPress={() => void handleApplyInviteCode()}
-              disabled={applyingInviteCode}
-            >
-              <Text style={styles.webPrimaryButtonText}>{applyingInviteCode ? t('Applying...') : t('Apply invite code')}</Text>
-            </TouchableOpacity>
+            <Text style={[styles.webHintText, { color: theme.secondaryText }]}>
+              {inviteSummary?.referredByUserId
+                ? t('This account is already linked to invite code {code}.', { code: inviteSummary.referredByCode || t('a friend') })
+                : t('Invite code redemption now requires an email invite first and only works on a new account within the first 24 hours. Ask your friend to send the invite from Membership before you sign up.')}
+            </Text>
 
             {inviteSummary ? (
               <Text style={[styles.webHintText, { color: theme.secondaryText }]}>
                 {rewardExpiryLabel
-                  ? t('Referral Premium active until {date}.', { date: rewardExpiryLabel })
+                  ? t('Referral Premium active until {date}. {days} days left.', { date: rewardExpiryLabel, days: referralDaysRemaining })
                   : t('{count}/3 uses toward your next Premium month', { count: inviteSummary.referralCount })}
               </Text>
             ) : null}
@@ -635,7 +591,7 @@ export default function ProfileScreen() {
             </Text>
             <Text style={[styles.inviteProgressHint, { color: isDark ? '#FED7AA' : '#7C2D12' }]}>
               {rewardExpiryLabel
-                ? t('Referral Premium active until {date}.', { date: rewardExpiryLabel })
+                ? t('Referral Premium active until {date}. {days} days left.', { date: rewardExpiryLabel, days: referralDaysRemaining })
                 : planTier === 'premium'
                   ? t('Your account already has Premium access.')
                   : t('{count} more successful uses to unlock Premium.', { count: referralsUntilNextReward })}
@@ -654,36 +610,11 @@ export default function ProfileScreen() {
 
             {planTier !== 'premium' ? (
               <>
-                <Text style={[styles.label, { color: theme.secondaryText }]}>{t("Redeem Someone Else's Invite Code")}</Text>
-                <TextInput
-                  style={[styles.input, { borderColor: theme.inputBorder, color: theme.inputText, backgroundColor: theme.inputBackground }]}
-                  placeholder="ABC123"
-                  placeholderTextColor={theme.tertiaryText}
-                  autoCapitalize="characters"
-                  value={inviteCodeInput}
-                  onChangeText={(value) => setInviteCodeInput(value.toUpperCase())}
-                  editable={!inviteSummary?.referredByUserId && !applyingInviteCode}
-                />
                 <Text style={[styles.inviteRedeemHint, { color: isDark ? '#FED7AA' : '#9A3412' }]}>
                   {inviteSummary?.referredByUserId
-                    ? t('You already redeemed invite code {code}.', { code: inviteSummary.referredByCode || inviteCodeInput })
-                    : t('Invite codes only work on new accounts and can be redeemed once per account.')}
+                    ? t('This account is already linked to invite code {code}.', { code: inviteSummary.referredByCode || t('a friend') })
+                    : t('Invite redemption is no longer done from Profile. A friend must invite your email first, then the code can only be redeemed on a new account within the first 24 hours.')}
                 </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.redeemButton,
-                    { backgroundColor: theme.primaryButton },
-                    (applyingInviteCode || Boolean(inviteSummary?.referredByUserId)) && styles.redeemButtonDisabled,
-                  ]}
-                  onPress={() => {
-                    void handleApplyInviteCode();
-                  }}
-                  disabled={applyingInviteCode || Boolean(inviteSummary?.referredByUserId)}
-                >
-                  <Text style={styles.redeemButtonText}>
-                    {applyingInviteCode ? t('Applying...') : t('Apply invite code')}
-                  </Text>
-                </TouchableOpacity>
               </>
             ) : null}
           </RNView>

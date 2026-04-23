@@ -7,10 +7,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceLanguage, normalizeLanguage } from '@/constants/i18n';
 import { normalizePlanTier } from '@/services/subscriptionPlan';
 import { showSharedUpdateNotification } from '@/services/notificationService';
-import { getMyInviteSummary, getMyPendingPremiumCelebration } from '@/services/referrals';
+import { getMyInviteSummary, getMyPendingPremiumCelebration, recordSuccessfulLogin } from '@/services/referrals';
 import { isTransientNetworkError, retryAsync } from '@/services/networkRetry';
 
 const LAST_PROTECTED_PATH_KEY = 'last_protected_path';
+const LAST_LOGIN_TRACKED_AT_PREFIX = 'last_login_tracked_at';
 const NON_RECOVERABLE_PATH_PREFIXES = [
     '/admin',
     '/(admin)',
@@ -31,6 +32,8 @@ const PUBLIC_PATH_PREFIXES = [
 ];
 const isMissingDefaultLanguageColumn = (message?: string) =>
     String(message || '').toLowerCase().includes('default_language');
+const isMissingTrialStartedAtColumn = (message?: string) =>
+    String(message || '').toLowerCase().includes('trial_started_at');
 const isInvalidRefreshTokenError = (message?: string) => {
     const normalized = String(message || '').toLowerCase();
     return normalized.includes('invalid refresh token') || normalized.includes('refresh token not found');
@@ -43,12 +46,13 @@ const normalizeRole = (role?: string | null) => {
 };
 
 export const useAuth = () => {
-    const { setSession, setUser, setRole, setPlanTier, setLanguage, setInitialized, session, initialized } = useAuthStore();
+    const { setSession, setUser, setRole, setPlanTier, setTrialStartedAt, setLanguage, setInitialized, session, initialized } = useAuthStore();
     const pathname = usePathname();
     const router = useRouter();
     const segments = useSegments();
     const profileSyncInFlightRef = useRef(false);
     const profileSyncQueuedRef = useRef(false);
+    const loginTrackingInFlightRef = useRef<Promise<void> | null>(null);
 
     const navigateToLanding = () => {
         const resetNavigation = (router as any)?.dismissAll;
@@ -58,6 +62,34 @@ export const useAuth = () => {
         router.replace('/');
     };
 
+    const trackLoginActivity = async (userId: string) => {
+        const todayKey = `${LAST_LOGIN_TRACKED_AT_PREFIX}:${userId}`;
+        const todayValue = new Date().toISOString().slice(0, 10);
+        const lastTracked = await AsyncStorage.getItem(todayKey);
+        if (lastTracked === todayValue) return;
+
+        const loginResult = await recordSuccessfulLogin();
+        if (loginResult.error) {
+            throw loginResult.error;
+        }
+
+        await AsyncStorage.setItem(todayKey, todayValue);
+    };
+
+    const ensureLoginTracked = async (userId: string) => {
+        if (!loginTrackingInFlightRef.current) {
+            loginTrackingInFlightRef.current = trackLoginActivity(userId)
+                .catch((error: any) => {
+                    console.error('login tracking failed:', error?.message || error);
+                })
+                .finally(() => {
+                    loginTrackingInFlightRef.current = null;
+                });
+        }
+
+        await loginTrackingInFlightRef.current;
+    };
+
     const resetLocalAuthState = async () => {
         await AsyncStorage.removeItem(LAST_PROTECTED_PATH_KEY);
         await clearPersistedAuthState();
@@ -65,6 +97,7 @@ export const useAuth = () => {
         setUser(null);
         setRole(null);
         setPlanTier('free');
+        setTrialStartedAt(null);
         setLanguage(getDeviceLanguage());
     };
 
@@ -83,14 +116,21 @@ export const useAuth = () => {
         return retryAsync(async () => {
             let { data, error } = await supabase
                 .from('profiles')
-                .select('role, default_language, plan_tier, premium_referral_expires_at')
+                .select('role, default_language, plan_tier, premium_referral_expires_at, trial_started_at')
                 .eq('id', userId)
                 .maybeSingle();
 
-            if (error && isMissingDefaultLanguageColumn(error.message)) {
+            if (error && (isMissingDefaultLanguageColumn(error.message) || isMissingTrialStartedAtColumn(error.message))) {
+                const fallbackFields = [
+                    'role',
+                    'plan_tier',
+                    'premium_referral_expires_at',
+                    ...(isMissingDefaultLanguageColumn(error.message) ? [] : ['default_language']),
+                    ...(isMissingTrialStartedAtColumn(error.message) ? [] : ['trial_started_at']),
+                ].join(', ');
                 const fallback = await supabase
                     .from('profiles')
-                    .select('role, plan_tier, premium_referral_expires_at')
+                    .select(fallbackFields)
                     .eq('id', userId)
                     .maybeSingle();
                 data = fallback.data as any;
@@ -104,8 +144,9 @@ export const useAuth = () => {
             const normalizedRole = normalizeRole((data as any)?.role);
             const planTier = normalizePlanTier((data as any)?.plan_tier, (data as any)?.premium_referral_expires_at);
             const language = normalizeLanguage((data as any)?.default_language, getDeviceLanguage());
+            const trialStartedAt = typeof (data as any)?.trial_started_at === 'string' ? (data as any)?.trial_started_at : null;
 
-            return { normalizedRole, planTier, language };
+            return { normalizedRole, planTier, language, trialStartedAt };
         }, {
             retries: 2,
             delayMs: 900,
@@ -149,9 +190,10 @@ export const useAuth = () => {
             do {
                 profileSyncQueuedRef.current = false;
 
-                const { normalizedRole, planTier, language } = await fetchProfileMeta(userId);
+                const { normalizedRole, planTier, language, trialStartedAt } = await fetchProfileMeta(userId);
                 setRole(normalizedRole);
                 setPlanTier(planTier);
+                setTrialStartedAt(trialStartedAt);
                 setLanguage(language);
                 await hydratePendingReferralReward();
             } while (profileSyncQueuedRef.current);
@@ -201,11 +243,13 @@ export const useAuth = () => {
                 setUser(session?.user ?? null);
 
                 if (session?.user?.id) {
+                    await ensureLoginTracked(session.user.id);
                     await hydrateSignedInUser(session.user);
                 } else {
                     await configureBillingForUser({});
                     setRole(null);
                     setPlanTier('free');
+                    setTrialStartedAt(null);
                     setLanguage(getDeviceLanguage());
                 }
             } catch (error: any) {
@@ -217,6 +261,7 @@ export const useAuth = () => {
                 console.error('auth session initialization failed:', error?.message || error);
                 setRole(null);
                 setPlanTier('free');
+                setTrialStartedAt(null);
                 setLanguage(getDeviceLanguage());
             } finally {
                 setInitialized(true);
@@ -233,6 +278,7 @@ export const useAuth = () => {
                     setUser(session?.user ?? null);
 
                     if (session?.user?.id) {
+                        await ensureLoginTracked(session.user.id);
                         await hydrateSignedInUser(session.user);
                     } else {
                         try {
@@ -242,6 +288,7 @@ export const useAuth = () => {
                         }
                         setRole(null);
                         setPlanTier('free');
+                        setTrialStartedAt(null);
                         setLanguage(getDeviceLanguage());
                         // Prevent stale protected-route recovery after a sign-out.
                         await AsyncStorage.removeItem(LAST_PROTECTED_PATH_KEY);

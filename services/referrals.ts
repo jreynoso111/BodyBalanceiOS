@@ -162,3 +162,20 @@ export async function markPremiumCelebrationSeen(): Promise<Error | null> {
   const { error } = await supabase.rpc('mark_premium_celebration_seen');
   return error ? new Error(error.message) : null;
 }
+
+export async function recordSuccessfulLogin(): Promise<{
+  data: { signInCount: number } | null;
+  error: Error | null;
+}> {
+  const { data, error } = await supabase.rpc('record_successful_login');
+  if (error) {
+    return { data: null, error: new Error(error.message) };
+  }
+
+  return {
+    data: {
+      signInCount: Number(data || 0),
+    },
+    error: null,
+  };
+}

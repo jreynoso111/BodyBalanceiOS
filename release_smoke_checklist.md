@@ -5,6 +5,8 @@ Use this checklist before promoting a build to production or store review.
 ## Automated gate
 
 - Run `npm run verify:release`.
+- Confirm `npm run verify:android-sync` passes if `android/` exists locally, so Expo config and prebuild output have not drifted.
+- Confirm `npm run verify:supabase-schema-state` passes, so there are no local migration changes still outside a committed repo state.
 - Run `npm run verify:supabase-config`.
 - Confirm the release test run includes:
   - billing readiness

@@ -9,7 +9,7 @@ import { getPlanLabel } from '@/services/subscriptionPlan';
 
 export default function AccountDashboardScreen() {
   const router = useRouter();
-  const { initialized, user, role, planTier } = useAuthStore();
+  const { initialized, user, role, planTier, trialStartedAt } = useAuthStore();
 
   if (initialized && !user) {
     return <Redirect href="/" />;
@@ -36,7 +36,7 @@ export default function AccountDashboardScreen() {
         <Card style={styles.panel}>
           <Text style={styles.panelTitle}>Account status</Text>
           <Text style={styles.panelBody}>
-            Plan: {getPlanLabel(planTier, { trialStartedAt: user?.created_at })}
+            Plan: {getPlanLabel(planTier, { trialStartedAt })}
           </Text>
           <Text style={styles.panelBody}>
             Role: {isAdmin ? 'Administrator' : 'Standard user'}
