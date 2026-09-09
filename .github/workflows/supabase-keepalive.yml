@@ -1,0 +1,52 @@
+name: Keep Supabase active
+
+on:
+  schedule:
+    # Every five days; the explicit dates keep the longest month-boundary gap under seven days.
+    - cron: '17 5 1,6,11,16,21,26 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: true
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Call Supabase keepalive RPC
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_URL}" || -z "${SUPABASE_PUBLISHABLE_KEY}" ]]; then
+            echo "SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY repository secrets are required." >&2
+            exit 1
+          fi
+
+          response="$(curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            --max-time 20 \
+            --request POST \
+            "${SUPABASE_URL}/rest/v1/rpc/keepalive_ping" \
+            --header "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            --header 'Content-Type: application/json' \
+            --header 'Accept: application/json' \
+            --data '{}')"
+
+          if [[ "${response}" != *'"ok": true'* && "${response}" != *'"ok":true'* ]]; then
+            echo "Supabase keepalive returned an unexpected response: ${response}" >&2
+            exit 1
+          fi
+
+          echo "Supabase keepalive succeeded."
