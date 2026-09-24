@@ -2,8 +2,8 @@ name: Keep Supabase active
 
 on:
   schedule:
-    # Every five days; the explicit dates keep the longest month-boundary gap under seven days.
-    - cron: '17 5 1,6,11,16,21,26 * *'
+    # Supabase recommends regular database activity; keep a small external read-only ping three times daily.
+    - cron: '17 5,13,21 * * *'
   workflow_dispatch:
 
 permissions: {}
